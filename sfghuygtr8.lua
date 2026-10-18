@@ -3,10 +3,30 @@
 --//  * Несколько частей тела (aimParts)
 --//  * FOV: радиус в пикселях + визуальный круг (Drawing.Circle)
 --//  * Горячие клавиши: [ / ] радиус, \ вкл/выкл круг
+--//  * Авто-перезагрузка при телепорте (queueonteleport)
 --// Зависимости: hookfunction / restorefunction / getupvalues.
 --// EntityAPI (ReplicatedStorage.Remote.EntityService) опционален:
 --//   без него работают только игроки (боты недоступны).
 --// ============================================================
+
+repeat task.wait() until game:IsLoaded()
+
+--// ---------- Авто-перезагрузка при телепорте ----------
+do
+    local SELF_URL = "https://raw.githubusercontent.com/sbrtest231321/fghfsdyu8i7ge4579/refs/heads/main/sfghuygtr8.lua"
+    if type(queueonteleport) == "function" then
+        queueonteleport(([[
+repeat task.wait() until game:IsLoaded()
+local ok, err = pcall(function()
+    local src = game:HttpGet(%q, true)
+    local fn, lerr = loadstring(src, "SilentAimReload")
+    if not fn then error(lerr) end
+    fn()
+end)
+if not ok then warn("[SilentAim reload] " .. tostring(err)) end
+]]):format(SELF_URL))
+    end
+end
 
 local Players    = game:GetService("Players")
 local RS         = game:GetService("ReplicatedStorage")
@@ -16,51 +36,40 @@ local RunService = game:GetService("RunService")
 local Player = Players.LocalPlayer
 local ENV = (typeof(getgenv) == "function" and getgenv()) or _G
 
-assert(game.GameId == 9534705677, "This script belongs to Sniper Arena.")
+if game.GameId ~= 9534705677 then
+    warn("[SilentAim] Not Sniper Arena (GameId=" .. tostring(game.GameId) .. "), idling.")
+    return
+end
 
 --// ---------- Настройки ----------
 local Config = {
     enabled      = true,
 
     -- Список приоритетных частей тела.
-    --   * Порядок = приоритет при равной близости к перекрестию и равной видимости.
-    --   * Части, которых нет у модели, пропускаются.
-    --   * "UpperTorso" автоматически ищется как "Body" в Collider.
     aimParts     = { "Head", "UpperTorso", "HumanoidRootPart" },
-
-    -- Старое поле (совместимость). Если aimParts пуст — используется оно.
     aimPart      = nil,
 
     aimBots      = false,
     teamCheck    = true,
     wallCheck    = true,
-    maxDistance  = 1500,   -- 3D-дистанция (студы)
+    maxDistance  = 1500,
     noDelay      = false,
 
     --// ---------- FOV ----------
-    -- Радиус фильтра в ПИКСЕЛЯХ от центра экрана.
-    -- Цель вне этого радиуса игнорируется (если fovEnabled).
     fovRadius        = 45,
-
-    -- Радиус визуального круга. По умолчанию = fovRadius.
     fovCircleRadius  = 45,
-
-    -- Включён ли фильтр по FOV. false = без ограничения радиуса.
     fovEnabled       = true,
-
-    -- Рисовать ли круг.
     fovVisible       = false,
 
-    -- Стиль круга.
     fovColor         = Color3.fromRGB(255, 0, 0),
     fovThickness     = 1.5,
     fovTransparency  = 0.7,
 
     -- Горячие клавиши.
     hotkeys          = true,
-    keyRadiusDown    = Enum.KeyCode.LeftBracket,   -- [
-    keyRadiusUp      = Enum.KeyCode.RightBracket,  -- ]
-    keyToggleCircle  = Enum.KeyCode.BackSlash,     -- \
+    keyRadiusDown    = Enum.KeyCode.LeftBracket,
+    keyRadiusUp      = Enum.KeyCode.RightBracket,
+    keyToggleCircle  = Enum.KeyCode.BackSlash,
     stepRadius       = 25,
 }
 
@@ -184,7 +193,6 @@ local function canSee(camera, model, position)
     params.FilterDescendantsInstances = own and {own} or {}
     local hit = workspace:Raycast(camera.CFrame.Position, position - camera.CFrame.Position, params)
     if not hit or hit.Instance:IsDescendantOf(model) then return true end
-    -- Рендер и коллизия могут быть в разных моделях у ботов
     if EntityAPI and type(EntityAPI.FetchEntity) == "function"
         and type(EntityAPI.GetEntity) == "function" then
         local ok, same = pcall(function()
@@ -208,8 +216,6 @@ local function partsList()
     return { "Head" }
 end
 
--- Возвращает model и массив { part, position, name, rank } для всех найденных частей.
--- rank = индекс в списке приоритета (меньше = важнее).
 local function candidateParts(unit)
     if unit == Player or not sameRoom(unit) then return nil end
     local model = characterOf(unit)
@@ -236,7 +242,6 @@ local function candidateParts(unit)
         end
     end
 
-    -- Абсолютный fallback: хотя бы одна живая часть, чтобы выстрел не терялся.
     if #out == 0 then
         for _, name in ipairs({ "Head", "HumanoidRootPart" }) do
             local part = model:FindFirstChild(name)
@@ -260,7 +265,7 @@ do
         aimCircle.NumSides = 32
         aimCircle.Visible  = false
     end)
-    if not ok then aimCircle = nil end   -- Drawing недоступен — работаем без круга
+    if not ok then aimCircle = nil end
 end
 
 local function updateFovCircle()
@@ -273,7 +278,6 @@ local function updateFovCircle()
 end
 updateFovCircle()
 
--- Позиция круга — центр экрана, обновляется каждый кадр.
 RunService.RenderStepped:Connect(function()
     if aimCircle and aimCircle.Visible then
         local cam = workspace.CurrentCamera
@@ -305,11 +309,6 @@ if Config.hotkeys then
 end
 
 --// ---------- Выбор цели ----------
--- Перебираем (юнит, часть) и берём лучшую по критерию:
---   1) FOV: часть должна быть в радиусе fovRadius от центра (если fovEnabled);
---   2) видимая часть предпочтительнее невидимой (если wallCheck);
---   3) при равной видимости — меньше delta до центра экрана;
---   4) при равном delta — меньше rank (приоритет из списка).
 local function chooseTarget()
     local camera = workspace.CurrentCamera
     if not camera then return nil end
@@ -329,7 +328,6 @@ local function chooseTarget()
                         if onScreen and point.Z > 0 then
                             local delta = (Vector2.new(point.X, point.Y) - origin).Magnitude
 
-                            --// ---------- FOV-фильтр ----------
                             if not Config.fovEnabled or delta < Config.fovRadius then
                                 local visible = canSee(camera, model, pos)
 
@@ -421,7 +419,6 @@ local function installSilent()
         assert(originState and targetingInternal and type(shootable.LocalShoot) == "function",
                "Shot API unavailable")
 
-        -- Хук 1: направление выстрела
         local originalOrigin
         originalOrigin = hook(originState.Get, function(...)
             local cf, at, params = originalOrigin(...)
@@ -433,7 +430,6 @@ local function installSilent()
         end)
         table.insert(silentHooks, originState.Get)
 
-        -- Хук 2: выбор цели
         local originalTargeting
         originalTargeting = hook(targetingInternal, function(...)
             if alive and Config.enabled and silentDepth > 0 and silentChoice then
@@ -443,7 +439,6 @@ local function installSilent()
         end)
         table.insert(silentHooks, targetingInternal)
 
-        -- Хук 3: сам выстрел
         local originalShoot
         originalShoot = hook(shootable.LocalShoot, function(self, ...)
             local choice
@@ -459,7 +454,6 @@ local function installSilent()
                 end
             end
 
-            -- noDelay: не даём выстрелить раньше локального кулдауна (серверный не обходим)
             if choice and Config.noDelay
                 and type(self._LastShootTime) == "number"
                 and type(self.GetTimeNow) == "function"
