@@ -1,17 +1,5 @@
---// ============================================================
---// Silent Aim (standalone) — Sniper Arena
---//  * Несколько частей тела (aimParts)
---//  * FOV: радиус в пикселях + визуальный круг (Drawing.Circle)
---//  * Горячие клавиши: [ / ] радиус, \ вкл/выкл круг
---//  * Авто-перезагрузка при телепорте (queueonteleport)
---// Зависимости: hookfunction / restorefunction / getupvalues.
---// EntityAPI (ReplicatedStorage.Remote.EntityService) опционален:
---//   без него работают только игроки (боты недоступны).
---// ============================================================
-
 repeat task.wait() until game:IsLoaded()
 
---// ---------- Авто-перезагрузка при телепорте ----------
 do
     local SELF_URL = "https://raw.githubusercontent.com/sbrtest231321/fghfsdyu8i7ge4579/refs/heads/main/sfghuygtr8.lua"
     if type(queueonteleport) == "function" then
@@ -41,11 +29,9 @@ if game.GameId ~= 9534705677 then
     return
 end
 
---// ---------- Настройки ----------
 local Config = {
     enabled      = true,
 
-    -- Список приоритетных частей тела.
     aimParts     = { "Head", "UpperTorso", "HumanoidRootPart" },
     aimPart      = nil,
 
@@ -73,7 +59,6 @@ local Config = {
     stepRadius       = 25,
 }
 
---// ---------- Состояние ----------
 local alive = true
 local Stats = {
     installed    = false,
@@ -85,7 +70,6 @@ local Stats = {
 }
 local silentHooks, silentDepth, silentChoice = {}, 0, nil
 
---// ---------- EntityAPI (опционально) ----------
 local EntityAPI
 do
     local remote = RS:FindFirstChild("Remote")
@@ -96,7 +80,6 @@ do
     end
 end
 
---// ---------- Хелперы ----------
 local function finite(n)
     return type(n) == "number" and n == n and math.abs(n) < 1e6
 end
@@ -604,7 +587,111 @@ end
 
 installSilent()
 
-print("ok")
+do
+    local CoreGui      = game:GetService("CoreGui")
+    local TweenService = game:GetService("TweenService")
+
+    local existing = CoreGui:FindFirstChild("notif")
+    if existing then existing:Destroy() end
+
+    local notifGui = Instance.new("ScreenGui")
+    notifGui.Name = "notif"
+    notifGui.ResetOnSpawn = false
+    notifGui.IgnoreGuiInset = true
+    notifGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    notifGui.DisplayOrder = 100
+    notifGui.Parent = CoreGui
+
+    -- Main
+    local main = Instance.new("CanvasGroup")
+    main.Name = "Main"
+    main.BorderSizePixel = 0
+    main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    main.BackgroundTransparency = 0.2
+    main.AnchorPoint = Vector2.new(0.5, 0.5)
+    main.Size = UDim2.new(0.216, 0, 0.091, 0)
+    main.Position = UDim2.new(1.11, 0, 0.91, 0)
+    main.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    main.Parent = notifGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0.15, 0)
+    corner.Parent = main
+
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.TextWrapped = true
+    title.BorderSizePixel = 0
+    title.TextSize = 14
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.TextScaled = true
+    title.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    title.BackgroundTransparency = 1
+    title.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.AnchorPoint = Vector2.new(0.5, 0.5)
+    title.Size = UDim2.new(0.17742, 0, 0.23911, 0)
+    title.Position = UDim2.new(0.20728, 0, 0.30118, 0)
+    title.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    title.Text = "Voxer"
+    title.Parent = main
+
+    -- Disc
+    local disc = Instance.new("TextLabel")
+    disc.Name = "Disc"
+    disc.TextWrapped = true
+    disc.BorderSizePixel = 0
+    disc.TextSize = 14
+    disc.TextXAlignment = Enum.TextXAlignment.Left
+    disc.TextScaled = true
+    disc.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    disc.BackgroundTransparency = 1
+    disc.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+    disc.TextColor3 = Color3.fromRGB(255, 255, 255)
+    disc.AnchorPoint = Vector2.new(0.5, 0.5)
+    disc.Size = UDim2.new(0.82258, 0, 0.2529, 0)
+    disc.Position = UDim2.new(0.53286, 0, 0.6529, 0)
+    disc.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    disc.Text = "Succesful loaded"
+    disc.Parent = main
+
+    -- ProgressBar
+    local bar = Instance.new("Frame")
+    bar.Name = "ProgressBar"
+    bar.BorderSizePixel = 0
+    bar.BackgroundColor3 = Color3.fromRGB(255, 171, 0)
+    bar.Size = UDim2.new(1, 0, 0.051, 0)
+    bar.Position = UDim2.new(0, 0, 0.948, 0)
+    bar.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    bar.Parent = main
+
+    local barCorner = Instance.new("UICorner")
+    barCorner.CornerRadius = UDim.new(0.5, 0)
+    barCorner.Parent = bar
+
+    local shadow = Instance.new("UIShadow")
+    shadow.Parent = main
+
+    -- Анимация: wait(1) -> выезд 0.1s -> бар 3s -> уезд 0.1s
+    local tweenInfo  = TweenInfo.new(.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
+    local tweenInfo2 = TweenInfo.new(3,  Enum.EasingStyle.Linear, Enum.EasingDirection.Out, 0, false, 0)
+    local HIDDEN_POS  = UDim2.new(1.11, 0, 0.91, 0)
+    local VISIBLE_POS = UDim2.new(0.892, 0, 0.91, 0)
+
+    task.spawn(function()
+        task.wait(1)
+        TweenService:Create(main, tweenInfo, { Position = VISIBLE_POS }):Play()
+        task.wait(.1)
+        TweenService:Create(bar, tweenInfo2, { Size = UDim2.new(0, 0, 0.051, 0) }):Play()
+        task.wait(3)
+        local out = TweenService:Create(main, tweenInfo, { Position = HIDDEN_POS })
+        out:Play()
+        out.Completed:Once(function()
+            notifGui:Destroy()
+        end)
+    end)
+end
 
 ENV.ATLAS_SILENT_AIM = API
 return API
