@@ -42,10 +42,10 @@ local Config = {
     noDelay      = false,
 
     --// ---------- FOV ----------
-    fovRadius        = 45,
-    fovCircleRadius  = 45,
+    fovRadius        = 120,
+    fovCircleRadius  = 120,
     fovEnabled       = true,
-    fovVisible       = false,
+    fovVisible       = true,
 
     fovColor         = Color3.fromRGB(255, 0, 0),
     fovThickness     = 1.5,
