@@ -25,7 +25,7 @@ local Player = Players.LocalPlayer
 local ENV = (typeof(getgenv) == "function" and getgenv()) or _G
 
 if game.GameId ~= 9534705677 then
-    warn("[SilentAim] Not Sniper Arena (GameId=" .. tostring(game.GameId) .. "), idling.")
+    warn("Not Sniper Arena (GameId=" .. tostring(game.GameId) .. "), idling.")
     return
 end
 
