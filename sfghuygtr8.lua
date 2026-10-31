@@ -51,7 +51,6 @@ local Config = {
     fovThickness     = 1.5,
     fovTransparency  = 0.7,
 
-    -- Горячие клавиши.
     hotkeys          = true,
     keyRadiusDown    = Enum.KeyCode.LeftBracket,
     keyRadiusUp      = Enum.KeyCode.RightBracket,
@@ -188,7 +187,6 @@ local function canSee(camera, model, position)
     return false
 end
 
---// ---------- Список частей ----------
 local function partsList()
     if type(Config.aimParts) == "table" and #Config.aimParts > 0 then
         return Config.aimParts
@@ -239,7 +237,6 @@ local function candidateParts(unit)
     return model, out
 end
 
---// ---------- Визуальный круг FOV ----------
 local aimCircle
 do
     local ok = pcall(function()
@@ -268,7 +265,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
---// ---------- Горячие клавиши ----------
 if Config.hotkeys then
     UIS.InputBegan:Connect(function(input, gp)
         if gp then return end
@@ -291,7 +287,6 @@ if Config.hotkeys then
     end)
 end
 
---// ---------- Выбор цели ----------
 local function chooseTarget()
     local camera = workspace.CurrentCamera
     if not camera then return nil end
@@ -351,7 +346,6 @@ local function chooseTarget()
     return nil
 end
 
---// ---------- Хуки ----------
 local function clearSilent()
     local unhook = ENV.restorefunction
         or (type(restorefunction) == "function" and restorefunction)
@@ -493,7 +487,6 @@ local function installSilent()
     return true
 end
 
---// ---------- Публичный API ----------
 local API = {
     Config = Config,
     Stats  = Stats,
@@ -602,7 +595,6 @@ do
     notifGui.DisplayOrder = 100
     notifGui.Parent = CoreGui
 
-    -- Main
     local main = Instance.new("CanvasGroup")
     main.Name = "Main"
     main.BorderSizePixel = 0
@@ -618,7 +610,6 @@ do
     corner.CornerRadius = UDim.new(0.15, 0)
     corner.Parent = main
 
-    -- Title
     local title = Instance.new("TextLabel")
     title.Name = "Title"
     title.TextWrapped = true
@@ -637,7 +628,6 @@ do
     title.Text = "Voxer"
     title.Parent = main
 
-    -- Disc
     local disc = Instance.new("TextLabel")
     disc.Name = "Disc"
     disc.TextWrapped = true
@@ -656,7 +646,6 @@ do
     disc.Text = "Succesful loaded"
     disc.Parent = main
 
-    -- ProgressBar
     local bar = Instance.new("Frame")
     bar.Name = "ProgressBar"
     bar.BorderSizePixel = 0
@@ -673,7 +662,6 @@ do
     local shadow = Instance.new("UIShadow")
     shadow.Parent = main
 
-    -- Анимация: wait(1) -> выезд 0.1s -> бар 3s -> уезд 0.1s
     local tweenInfo  = TweenInfo.new(.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, false, 0)
     local tweenInfo2 = TweenInfo.new(3,  Enum.EasingStyle.Linear, Enum.EasingDirection.Out, 0, false, 0)
     local HIDDEN_POS  = UDim2.new(1.11, 0, 0.91, 0)
