@@ -35,7 +35,7 @@ local Config = {
     aimParts     = { "Head", "UpperTorso", "HumanoidRootPart" },
     aimPart      = nil,
 
-    aimBots      = false,
+    aimBots      = true,
     teamCheck    = true,
     wallCheck    = true,
     maxDistance  = 1500,
