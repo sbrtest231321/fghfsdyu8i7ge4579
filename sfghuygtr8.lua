@@ -1478,7 +1478,7 @@ function Fly.start()
 end
 
 local combat = tabFrames.Combat
-local RageBot = { Enabled = false, LimitToFOV = false, QuickScope = false, TeamCheck = false, MaxDistance = 500, FOVRadius = 220, WallCheck = true, ClickCooldown = 0.1, _lastClick = 0 }
+local RageBot = { Enabled = false, LimitToFOV = false, QuickScope = false, TeamCheck = false, MaxDistance = 500, FOVRadius = 220, WallCheck = true, ClickCooldown = 1, _lastClick = 0 }
 
 local function rbClick()
     local m1 = getgenv().mouse1click or (type(mouse1click) == "function" and mouse1click)
