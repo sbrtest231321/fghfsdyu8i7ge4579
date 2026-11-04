@@ -1772,10 +1772,10 @@ Speed.Amount = spdSliderState.Value
 
 local flyCard, flySet, flyEnable, flyKeybind = buildModule(movement, {
     name = "Fly", title = "Fly", cardH = 0.11, layoutOrder = 2,
-    titleSize = UDim2.new(0, 261, 0, 39), titlePos = UDim2.new(0, 159, 0, 38),
-    enablePos = UDim2.new(0, 500, 0, 38), enableSize = UDim2.new(0, 58, 0, 33),
-    keybindPos = UDim2.new(0, 396, 0, 37), keybindSize = UDim2.new(0, 88, 0, 31),
-    settingsPos = UDim2.new(0, 292, 0, 265), settingsSize = UDim2.new(0, 586, 0, 383),
+    titleSize = UDim2.new(0.445, 0, 0.193, 0), titlePos = UDim2.new(0.271, 0, 0.188, 0),
+    enablePos = UDim2.new(0.852, 0, 0.188, 0), enableSize = UDim2.new(0.099, 0, 0.164, 0),
+    keybindPos = UDim2.new(0.675, 0, 0.183, 0), keybindSize = UDim2.new(0.15, 0, 0.154, 0),
+    settingsPos = UDim2.new(0.498, 0, 1.314, 0), settingsSize = UDim2.new(0.999, 0, 1.899, 0),
     onEnable = function(v) Fly.Enabled = v; if v then Fly.start() else Fly.stop() end end,
 })
 local flySpeedState = makeSliderRow(flySet, "Speed", 0, 500, 50, 5, 0, function(v) Fly.Speed = v end)
@@ -1810,10 +1810,10 @@ function LongNeck.start()
 end
 local lnCard, lnSet, lnEnable, lnKeybind = buildModule(utils, {
     name = "LongNeck", title = "Long Neck", cardH = 0.07, layoutOrder = 1,
-    titleSize = UDim2.new(0, 261, 0, 39), titlePos = UDim2.new(0, 159, 0, 38),
-    enablePos = UDim2.new(0, 500, 0, 38), enableSize = UDim2.new(0, 58, 0, 33),
-    keybindPos = UDim2.new(0, 396, 0, 37), keybindSize = UDim2.new(0, 88, 0, 31),
-    settingsPos = UDim2.new(0, 292, 0, 265), settingsSize = UDim2.new(0, 586, 0, 383),
+    titleSize = UDim2.new(0.445, 0, 0.304, 0), titlePos = UDim2.new(0.271, 0, 0.296, 0),
+    enablePos = UDim2.new(0.852, 0, 0.296, 0), enableSize = UDim2.new(0.099, 0, 0.257, 0),
+    keybindPos = UDim2.new(0.675, 0, 0.288, 0), keybindSize = UDim2.new(0.15, 0, 0.241, 0),
+    settingsPos = UDim2.new(0.498, 0, 2.064, 0), settingsSize = UDim2.new(0.999, 0, 2.984, 0),
     onEnable = function(v) LongNeck.Enabled = v; if v then LongNeck.start() else LongNeck.stop() end end,
 })
 local lnSliderState = makeSliderRow(lnSet, "Distance", 0, 20, 10, 5, 0, function(v)
