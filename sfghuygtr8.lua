@@ -428,7 +428,6 @@ local TeamCheck = {
     end,
 }
 
--- ИЗМЕНЕНО: Единый модуль WallCheck
 local WallCheck = {}
 local wallCheckParams = RaycastParams.new()
 wallCheckParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -832,7 +831,6 @@ do
     end
 end
 
--- Универсальные функции
 local function getUnitModel(unit)
     if typeof(unit) == "Instance" and unit:IsA("Model") then return unit end
     if unit.Character then return unit.Character end
@@ -917,7 +915,6 @@ do
         if not Config.teamCheck then return false end
         return TeamCheck.IsFriendlyUnit(unit)
     end
-    -- ИЗМЕНЕНО: удалены локальные wallCheckParams/updateWallFilter/canSee
     local function partsList()
         if type(Config.aimParts) == "table" and #Config.aimParts > 0 then return Config.aimParts end
         return { "Head" }
@@ -985,7 +982,6 @@ do
                             if onScreen and point.Z > 0 then
                                 local delta = (Vector2.new(point.X, point.Y) - origin).Magnitude
                                 if not Config.fovEnabled or delta < Config.fovRadius then
-                                    -- ИЗМЕНЕНО: используем общий WallCheck
                                     local visible = not Config.wallCheck or WallCheck.CanSee(camera, model, pos)
                                     local better
                                     if not best then better = true
@@ -1145,7 +1141,6 @@ local function tbGetPlayerUnderCursor()
     local hum = hitChar:FindFirstChildOfClass("Humanoid")
     if not hum or hum.Health <= 0 then return nil end
     if TriggerBot.TeamCheck and TeamCheck.IsFriendlyPlayer(hp) then return nil end
-    -- ИЗМЕНЕНО: добавлена проверка VisibleCheck через общий WallCheck
     if TriggerBot.VisibleCheck and not WallCheck.CanSee(Camera, hitChar, res.Position) then return nil end
     return hp, hitChar
 end
@@ -1525,8 +1520,6 @@ local function aaAimOrigin(camera)
     return UIS:GetMouseLocation() - GuiService:GetGuiInset()
 end
 
--- ИЗМЕНЕНО: удалены aaWallParams/aaUpdateWallFilter/aaCanSee
-
 local function aaChooseTarget()
     local camera = workspace.CurrentCamera
     if not camera then return nil end
@@ -1542,7 +1535,6 @@ local function aaChooseTarget()
                 if visible and point.Z > 0 and (position - camera.CFrame.Position).Magnitude <= AimAssist.MaxDistance then
                     local delta = (Vector2.new(point.X, point.Y) - origin).Magnitude
                     if delta < AimAssist.Radius then
-                        -- ИЗМЕНЕНО: используем общий WallCheck
                         local vS = not AimAssist.WallCheck or WallCheck.CanSee(camera, model, position)
                         local allowed = not AimAssist.WallCheck or vS
                         local pV = vS and not bestVisible
@@ -1710,8 +1702,8 @@ local rbCard, rbSet, rbEnable, rbKeybind = buildModule(combat, {
 local rbLimitFovState = makeToggleRow(rbSet, "Limit To FOV", 1)
 local rbQuickScopeState = makeToggleRow(rbSet, "Quick Scope", 2)
 local rbTeamState = makeToggleRow(rbSet, "Team Check", 3)
-local rbDistState = makeSliderRow(rbSet, "Distance", 0, 5000, 500, 5, 0, function(v) RageBot.MaxDistance = v end)
-local rbVisibleState = makeToggleRow(rbSet, "VIsible Check", 4)
+local rbDistState = makeSliderRow(rbSet, "Distance", 0, 5000, 500, 4, 0, function(v) RageBot.MaxDistance = v end)
+local rbVisibleState = makeToggleRow(rbSet, "VIsible Check", 5)
 RageBot.MaxDistance = rbDistState.Value
 RageBot.LimitToFOV = rbLimitFovState.Enabled
 RageBot.QuickScope = rbQuickScopeState.Enabled
@@ -1723,7 +1715,10 @@ RunService.Heartbeat:Connect(function()
     RageBot.TeamCheck = rbTeamState.Enabled
     RageBot.WallCheck = rbVisibleState.Enabled
     RageBot.MaxDistance = rbDistState.Value
-    if AimAssist and AimAssist.Radius then RageBot.FOVRadius = AimAssist.Radius end
+    -- ИЗМЕНЕНО: RageBot берет FOV из SilentAim
+    if SilentAim and SilentAim.API and SilentAim.API.Config then
+        RageBot.FOVRadius = SilentAim.API.Config.fovRadius
+    end
 end)
 task.spawn(function()
     while task.wait(0.01) do
@@ -1737,6 +1732,7 @@ task.spawn(function()
                     origin = UIS:GetMouseLocation() - GuiService:GetGuiInset()
                 end
                 local bestUnit, bestPart = nil, nil
+                -- Если LimitToFOV включен, ограничиваем радиусом из SilentAim. Если выключен - стреляем по всем видимым на экране
                 local bestDist = RageBot.LimitToFOV and RageBot.FOVRadius or math.huge
                 local maxDist = RageBot.MaxDistance
                 for _, unit in ipairs(getAllTargets(true)) do
@@ -1750,7 +1746,6 @@ task.spawn(function()
                                 if onScreen and point.Z > 0 then
                                     local delta = (Vector2.new(point.X, point.Y) - origin).Magnitude
                                     if delta < bestDist then
-                                        -- ИЗМЕНЕНО: используем общий WallCheck
                                         if not RageBot.WallCheck or WallCheck.CanSee(camera, model, pos) then
                                             bestUnit, bestPart = unit, part
                                             bestDist = delta
