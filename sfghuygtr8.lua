@@ -639,7 +639,8 @@ local function makeSliderRow(parent, titleText, min, max, default, order, decima
     return state, apply, row
 end
 
-local function makeDropdownRow(parent, titleText, defaultText, order, onChange)
+-- ИЗМЕНЕНО: добавлен аргумент options в конец
+local function makeDropdownRow(parent, titleText, defaultText, order, onChange, options)
     local row = Instance.new("Frame", parent)
     row.AnchorPoint = Vector2.new(0.5, 0.5)
     row.Size = UDim2.new(0.89595, 0, 0.09382, 0)
@@ -693,6 +694,8 @@ local function makeDropdownRow(parent, titleText, defaultText, order, onChange)
         if onChange then onChange(name) end
     end
     state.Set = setValue
+    
+    options = options or {"Closest", "Head", "Torso"}
     local function makeOpt(name, optOrder)
         local btn = Instance.new("TextButton", dvar)
         btn.BackgroundColor3 = Color3.fromRGB(66, 66, 66)
@@ -705,9 +708,10 @@ local function makeDropdownRow(parent, titleText, defaultText, order, onChange)
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0.2, 0)
         btn.MouseButton1Click:Connect(function() setValue(name) end)
     end
-    makeOpt("Closest", 0)
-    makeOpt("Head", 1)
-    makeOpt("Torso", 2)
+    for i, optName in ipairs(options) do
+        makeOpt(optName, i - 1)
+    end
+    
     dropdown.MouseButton1Click:Connect(function() dvar.Visible = not dvar.Visible end)
     return state, row
 end
@@ -1366,8 +1370,35 @@ function Chams.SetEnabled(v)
     if not v then for _,hl in pairs(ChamsHighlights) do hl.Enabled=false end end
 end
 
-local Speed = { Enabled = false, Amount = 50, _conn = nil }
-function Speed.stop() if Speed._conn then Speed._conn:Disconnect(); Speed._conn = nil end end
+-- ИЗМЕНЕНО: Обертки для нажатия клавиш
+local function doKeyPress(vkCode)
+    local kp = getgenv().keypress or (type(keypress) == "function" and keypress)
+    if type(kp) == "function" then pcall(kp, vkCode) return end
+    local vim = game:GetService("VirtualInputManager")
+    if vim then 
+        local key = Enum.KeyCode.LeftControl
+        if vkCode == 0x11 then key = Enum.KeyCode.LeftControl end
+        pcall(function() vim:SendKeyEvent(true, key, false, game) end) 
+    end
+end
+local function doKeyRelease(vkCode)
+    local kr = getgenv().keyrelease or (type(keyrelease) == "function" and keyrelease)
+    if type(kr) == "function" then pcall(kr, vkCode) return end
+    local vim = game:GetService("VirtualInputManager")
+    if vim then 
+        local key = Enum.KeyCode.LeftControl
+        if vkCode == 0x11 then key = Enum.KeyCode.LeftControl end
+        pcall(function() vim:SendKeyEvent(false, key, false, game) end) 
+    end
+end
+
+-- ИЗМЕНЕНО: Добавлена логика Bypass в Speed
+local Speed = { Enabled = false, Amount = 50, BypassMethod = "None", _conn = nil, _isPulsing = false }
+function Speed.stop() 
+    if Speed._conn then Speed._conn:Disconnect(); Speed._conn = nil end 
+    Speed._isPulsing = false
+    doKeyRelease(0x11)
+end
 function Speed.start()
     Speed.stop()
     Speed._conn = RunService.Heartbeat:Connect(function(dt)
@@ -1379,7 +1410,46 @@ function Speed.start()
         if not hrp or not h then return end
         local hv = Vector3.zero
         if h.MoveDirection.Magnitude > 0 then hv = h.MoveDirection * (Speed.Amount/50) * 60 end
+        
+        -- Bypass Pulse: остановка движения
+        if Speed.BypassMethod == "Pulse" and Speed._isPulsing then
+            hv = Vector3.zero
+        end
+        
         hrp.AssemblyLinearVelocity = Vector3.new(hv.X, hrp.AssemblyLinearVelocity.Y, hv.Z)
+    end)
+    
+    -- Bypass Slide & Pulse логика таймеров
+    task.spawn(function()
+        local lastSlide = 0
+        local lastPulse = 0
+        while Speed.Enabled do
+            local now = os.clock()
+            if Speed.BypassMethod == "Slide" then
+                if now - lastSlide >= 1.5 then
+                    lastSlide = now
+                    doKeyPress(0x11)
+                    task.wait(0.5)
+                    doKeyRelease(0x11)
+                else
+                    task.wait(0.1)
+                end
+            elseif Speed.BypassMethod == "Pulse" then
+                if now - lastPulse >= 1 then
+                    lastPulse = now
+                    Speed._isPulsing = true
+                    task.wait(.3)
+                    Speed._isPulsing = false
+                else
+                    task.wait(0.1)
+                end
+            else
+                Speed._isPulsing = false
+                task.wait(0.1)
+            end
+        end
+        Speed._isPulsing = false
+        doKeyRelease(0x11)
     end)
 end
 
@@ -1693,10 +1763,10 @@ end)
 
 local rbCard, rbSet, rbEnable, rbKeybind = buildModule(combat, {
     name = "RageBot", title = "Rage Bot", cardH = 0.17, layoutOrder = 4,
-    titleSize = UDim2.new(0.445, 0, 0.118, 0), titlePos = UDim2.new(0.271, 0, 0.115, 0),
-    enablePos = UDim2.new(0.852, 0, 0.115, 0), enableSize = UDim2.new(0.099, 0, 0.1, 0),
-    keybindPos = UDim2.new(0.675, 0, 0.112, 0), keybindSize = UDim2.new(0.15, 0, 0.094, 0),
-    settingsPos = UDim2.new(0.496, 0, 0.803, 0), settingsSize = UDim2.new(0.999, 0, 1.16, 0),
+    titleSize = UDim2.new(0.445, 0, 0.125, 0), titlePos = UDim2.new(0.271, 0, 0.125, 0),
+    enablePos = UDim2.new(0.852, 0, 0.125, 0), enableSize = UDim2.new(0.099, 0, 0.106, 0),
+    keybindPos = UDim2.new(0.675, 0, 0.122, 0), keybindSize = UDim2.new(0.15, 0, 0.099, 0),
+    settingsPos = UDim2.new(0.498, 0, 0.853, 0), settingsSize = UDim2.new(0.999, 0, 1.229, 0),
     onEnable = function(v) RageBot.Enabled = v end,
 })
 local rbLimitFovState = makeToggleRow(rbSet, "Limit To FOV", 1)
@@ -1715,7 +1785,6 @@ RunService.Heartbeat:Connect(function()
     RageBot.TeamCheck = rbTeamState.Enabled
     RageBot.WallCheck = rbVisibleState.Enabled
     RageBot.MaxDistance = rbDistState.Value
-    -- ИЗМЕНЕНО: RageBot берет FOV из SilentAim
     if SilentAim and SilentAim.API and SilentAim.API.Config then
         RageBot.FOVRadius = SilentAim.API.Config.fovRadius
     end
@@ -1732,7 +1801,6 @@ task.spawn(function()
                     origin = UIS:GetMouseLocation() - GuiService:GetGuiInset()
                 end
                 local bestUnit, bestPart = nil, nil
-                -- Если LimitToFOV включен, ограничиваем радиусом из SilentAim. Если выключен - стреляем по всем видимым на экране
                 local bestDist = RageBot.LimitToFOV and RageBot.FOVRadius or math.huge
                 local maxDist = RageBot.MaxDistance
                 for _, unit in ipairs(getAllTargets(true)) do
@@ -1781,6 +1849,10 @@ local spdCard, spdSet, spdEnable, spdKeybind = buildModule(movement, {
 })
 local spdSliderState = makeSliderRow(spdSet, "Amount", 0, 500, 50, 5, 0, function(v) Speed.Amount = v end)
 Speed.Amount = spdSliderState.Value
+
+-- ИЗМЕНЕНО: Добавлен дропдаун Bypass Method для Speed
+local spdBypassState = makeDropdownRow(spdSet, "Bypass Method", "None", 6, function(val) Speed.BypassMethod = val end, {"None", "Slide", "Pulse"})
+Speed.BypassMethod = spdBypassState.Value
 
 local flyCard, flySet, flyEnable, flyKeybind = buildModule(movement, {
     name = "Fly", title = "Fly", cardH = 0.11, layoutOrder = 2,
@@ -1929,7 +2001,7 @@ registerState("chams_outline", chamsOutlineState); registerState("chams_team", c
 registerState("chams_keybind", chamsKeybind)
 
 registerState("speed_enabled", spdEnable); registerState("speed_amount", spdSliderState)
-registerState("speed_keybind", spdKeybind)
+registerState("speed_bypass", spdBypassState); registerState("speed_keybind", spdKeybind)
 
 registerState("fly_enabled", flyEnable); registerState("fly_speed", flySpeedState)
 registerState("fly_vertical", flyVertState); registerState("fly_keybind", flyKeybind)
