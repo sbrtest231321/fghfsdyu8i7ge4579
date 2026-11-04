@@ -37,7 +37,6 @@ end
 
 local keybindRegistry = {}
 local recordingKeybind = nil
-
 local notifGui = nil
 
 local function Notify(titleText, discText, duration)
@@ -429,6 +428,35 @@ local TeamCheck = {
     end,
 }
 
+-- ИЗМЕНЕНО: Единый модуль WallCheck
+local WallCheck = {}
+local wallCheckParams = RaycastParams.new()
+wallCheckParams.FilterType = Enum.RaycastFilterType.Exclude
+wallCheckParams.RespectCanCollide = false
+
+local function updateWallCheckFilter()
+    local list = {}
+    if LP.Character then table.insert(list, LP.Character) end
+    wallCheckParams.FilterDescendantsInstances = list
+end
+updateWallCheckFilter()
+LP.CharacterAdded:Connect(function() task.wait(0.2); updateWallCheckFilter() end)
+
+function WallCheck.CanSee(camera, model, position)
+    if not camera or not model or not position then return false end
+    local origin = camera.CFrame.Position
+    local myChar = LP.Character
+    local head = myChar and myChar:FindFirstChild("Head")
+    local hrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if head and hrp and (origin - head.Position).Magnitude < 1.5 then
+        origin = hrp.Position + Vector3.new(0, 1.5, 0)
+    end
+    local dir = position - origin
+    if dir.Magnitude < 0.01 then return true end
+    local hit = workspace:Raycast(origin, dir.Unit * 1000, wallCheckParams)
+    return hit and hit.Instance:IsDescendantOf(model) or false
+end
+
 local function buildHeaderToggleVisual(btn)
     local cg = Instance.new("CanvasGroup", btn)
     cg.BackgroundColor3 = Color3.fromRGB(46, 46, 46)
@@ -804,6 +832,47 @@ do
     end
 end
 
+-- Универсальные функции
+local function getUnitModel(unit)
+    if typeof(unit) == "Instance" and unit:IsA("Model") then return unit end
+    if unit.Character then return unit.Character end
+    return nil
+end
+
+local function getAllTargets(includeBots)
+    if includeBots == nil then includeBots = true end
+    local units, seen = {}, {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP then
+            table.insert(units, p)
+            seen[p] = true
+        end
+    end
+    if not includeBots then return units end
+    local function add(m)
+        if typeof(m) == "Instance" and m:IsA("Model") and not seen[m]
+            and m:GetAttribute("_entity") == "HumanoidEntity"
+            and not Players:GetPlayerFromCharacter(m) then
+            seen[m] = true
+            table.insert(units, m)
+        end
+    end
+    if EntityAPI and EntityAPI.Entity and type(EntityAPI.Entity.GetAll) == "function" then
+        local ok, reg = pcall(EntityAPI.Entity.GetAll)
+        if ok and type(reg) == "table" then
+            for _, e in pairs(reg._items or reg) do if type(e) == "table" then add(e.Instance) end end
+        end
+    end
+    local worlds = workspace:FindFirstChild("World")
+    if worlds then
+        for _, w in ipairs(worlds:GetChildren()) do
+            local ents = w:FindFirstChild("Entities")
+            if ents then for _, m in ipairs(ents:GetChildren()) do add(m) end end
+        end
+    end
+    return units
+end
+
 local SilentAim = { API = nil, Enabled = false, _installed = false }
 
 do
@@ -848,56 +917,7 @@ do
         if not Config.teamCheck then return false end
         return TeamCheck.IsFriendlyUnit(unit)
     end
-    local function targetUnits()
-        local units = Players:GetPlayers()
-        if not Config.aimBots then return units end
-        local seen = {}
-        local function add(model)
-            if typeof(model) == "Instance" and model:IsA("Model") and not seen[model]
-                and model:GetAttribute("_entity") == "HumanoidEntity"
-                and not Players:GetPlayerFromCharacter(model) then
-                seen[model] = true; table.insert(units, model)
-            end
-        end
-        if EntityAPI and EntityAPI.Entity and type(EntityAPI.Entity.GetAll) == "function" then
-            local ok, reg = pcall(EntityAPI.Entity.GetAll)
-            if ok and type(reg) == "table" then
-                for _, e in pairs(reg._items or reg) do if type(e) == "table" then add(e.Instance) end end
-            end
-        end
-        local worlds = workspace:FindFirstChild("World")
-        if worlds then
-            for _, w in ipairs(worlds:GetChildren()) do
-                local ents = w:FindFirstChild("Entities")
-                if ents then for _, m in ipairs(ents:GetChildren()) do add(m) end end
-            end
-        end
-        return units
-    end
-    local wallCheckParams = RaycastParams.new()
-    wallCheckParams.FilterType = Enum.RaycastFilterType.Exclude
-    wallCheckParams.RespectCanCollide = false
-    local function updateWallFilter()
-        local list = {}
-        if LP.Character then table.insert(list, LP.Character) end
-        wallCheckParams.FilterDescendantsInstances = list
-    end
-    updateWallFilter()
-    LP.CharacterAdded:Connect(function() task.wait(0.2); updateWallFilter() end)
-    local function canSee(camera, model, position)
-        if not Config.wallCheck then return true end
-        local origin = camera.CFrame.Position
-        local myChar = LP.Character
-        local head = myChar and myChar:FindFirstChild("Head")
-        local hrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
-        if head and hrp and (origin - head.Position).Magnitude < 1.5 then
-            origin = hrp.Position + Vector3.new(0, 1.5, 0)
-        end
-        local dir = position - origin
-        if dir.Magnitude < 0.01 then return true end
-        local hit = workspace:Raycast(origin, dir.Unit * 1000, wallCheckParams)
-        return hit and hit.Instance:IsDescendantOf(model) or false
-    end
+    -- ИЗМЕНЕНО: удалены локальные wallCheckParams/updateWallFilter/canSee
     local function partsList()
         if type(Config.aimParts) == "table" and #Config.aimParts > 0 then return Config.aimParts end
         return { "Head" }
@@ -954,7 +974,7 @@ do
         local origin = camera.ViewportSize / 2
         local best = nil
         Stats.fovFiltered = 0
-        for _, unit in ipairs(targetUnits()) do
+        for _, unit in ipairs(getAllTargets(Config.aimBots)) do
             if not friendlyUnit(unit) then
                 local model, parts = candidateParts(unit)
                 if model then
@@ -965,7 +985,8 @@ do
                             if onScreen and point.Z > 0 then
                                 local delta = (Vector2.new(point.X, point.Y) - origin).Magnitude
                                 if not Config.fovEnabled or delta < Config.fovRadius then
-                                    local visible = canSee(camera, model, pos)
+                                    -- ИЗМЕНЕНО: используем общий WallCheck
+                                    local visible = not Config.wallCheck or WallCheck.CanSee(camera, model, pos)
                                     local better
                                     if not best then better = true
                                     elseif visible and not best.visible then better = true
@@ -1124,6 +1145,8 @@ local function tbGetPlayerUnderCursor()
     local hum = hitChar:FindFirstChildOfClass("Humanoid")
     if not hum or hum.Health <= 0 then return nil end
     if TriggerBot.TeamCheck and TeamCheck.IsFriendlyPlayer(hp) then return nil end
+    -- ИЗМЕНЕНО: добавлена проверка VisibleCheck через общий WallCheck
+    if TriggerBot.VisibleCheck and not WallCheck.CanSee(Camera, hitChar, res.Position) then return nil end
     return hp, hitChar
 end
 local function tbClick()
@@ -1158,24 +1181,16 @@ local ESPFolder = Instance.new("Folder")
 ESPFolder.Parent = CoreGui
 local ESPBoxes, ESPLabels = {}, {}
 
-local function espGetCharacter(p)
-    local c = p.Character
-    if not c then return nil end
-    local hrp = c:FindFirstChild("HumanoidRootPart")
-    local hum = c:FindFirstChild("Humanoid")
-    if not hrp or not hum or hum.Health <= 0 then return nil end
-    return c, hrp, hum
-end
-local function espCreateBox(p)
-    if p == LP or ESPBoxes[p] then return end
+local function espCreateBox(model)
+    if not model or ESPBoxes[model] then return end
     local b = {Top=Drawing.new("Line"),Bottom=Drawing.new("Line"),Left=Drawing.new("Line"),Right=Drawing.new("Line")}
     for _, l in pairs(b) do l.Visible=false; l.Color=ESP.BoxColor; l.Thickness=ESP.BoxThickness end
-    ESPBoxes[p] = b
+    ESPBoxes[model] = b
 end
-local function espCreateLabel(p)
-    if p == LP or ESPLabels[p] then return end
+local function espCreateLabel(model)
+    if not model or ESPLabels[model] then return end
     local bb = Instance.new("BillboardGui")
-    bb.Name = p.Name .. "_VoxerLabel"
+    bb.Name = "VoxerLabel"
     bb.Parent = ESPFolder
     bb.ResetOnSpawn = false
     bb.AlwaysOnTop = true
@@ -1197,67 +1212,88 @@ local function espCreateLabel(p)
     dl.TextSize = ESP.TextSize - 2
     dl.TextColor3 = Color3.fromRGB(200,200,200)
     dl.TextStrokeTransparency = 0
-    ESPLabels[p] = {Billboard=bb, NameLabel=nl, DistanceLabel=dl}
+    ESPLabels[model] = {Billboard=bb, NameLabel=nl, DistanceLabel=dl}
 end
-local function espUpdateBox(p)
-    local b = ESPBoxes[p]
-    if not b then return end
-    if ESP.TeamCheck and TeamCheck.IsFriendlyPlayer(p) then for _,l in pairs(b) do l.Visible=false end; return end
-    if not ESP.Enabled or not ESP.ShowBox then for _,l in pairs(b) do l.Visible=false end; return end
-    local c, hrp = espGetCharacter(p)
-    if not c then for _,l in pairs(b) do l.Visible=false end; return end
-    local d = (hrp.Position - Camera.CFrame.Position).Magnitude
-    if d > ESP.MaxDistance then for _,l in pairs(b) do l.Visible=false end; return end
-    local sz = c:GetExtentsSize()
-    local tp = (hrp.CFrame * CFrame.new(0, sz.Y/2, 0)).Position
-    local bp = (hrp.CFrame * CFrame.new(0, -sz.Y/2, 0)).Position
-    local t, to_ = Camera:WorldToViewportPoint(tp)
-    local bt, bo_ = Camera:WorldToViewportPoint(bp)
-    if not to_ or not bo_ or t.Z<=0 or bt.Z<=0 then for _,l in pairs(b) do l.Visible=false end; return end
-    local h = bt.Y - t.Y
-    local w = h * 0.65
-    local lX, rX = t.X - w/2, t.X + w/2
-    b.Top.From = Vector2.new(lX, t.Y); b.Top.To = Vector2.new(rX, t.Y); b.Top.Visible = true
-    b.Bottom.From = Vector2.new(lX, bt.Y); b.Bottom.To = Vector2.new(rX, bt.Y); b.Bottom.Visible = true
-    b.Left.From = Vector2.new(lX, t.Y); b.Left.To = Vector2.new(lX, bt.Y); b.Left.Visible = true
-    b.Right.From = Vector2.new(rX, t.Y); b.Right.To = Vector2.new(rX, bt.Y); b.Right.Visible = true
+local function espRemoveModel(model)
+    if ESPBoxes[model] then for _,l in pairs(ESPBoxes[model]) do l:Remove() end; ESPBoxes[model]=nil end
+    if ESPLabels[model] then ESPLabels[model].Billboard:Destroy(); ESPLabels[model]=nil end
 end
-local function espUpdateLabel(p)
-    local d = ESPLabels[p]
-    if not d then return end
-    if ESP.TeamCheck and TeamCheck.IsFriendlyPlayer(p) then d.Billboard.Enabled = false; return end
-    if not ESP.Enabled or (not ESP.ShowName and not ESP.ShowDistance) then d.Billboard.Enabled = false; return end
-    local c, hrp = espGetCharacter(p)
-    if not c then d.Billboard.Enabled = false; return end
-    local dist = (hrp.Position - Camera.CFrame.Position).Magnitude
-    if dist > ESP.MaxDistance then d.Billboard.Enabled = false; return end
-    d.Billboard.Adornee = hrp
-    d.Billboard.Enabled = true
-    if ESP.ShowName then
-        d.NameLabel.Visible = true
-        d.NameLabel.Text = p.DisplayName
-        d.NameLabel.TextColor3 = ESP.TextColor
-        d.NameLabel.TextSize = ESP.TextSize
-    else d.NameLabel.Visible = false end
-    if ESP.ShowDistance then
-        d.DistanceLabel.Visible = true
-        d.DistanceLabel.Text = string.format("[%d]", math.floor(dist))
-        d.DistanceLabel.TextSize = math.max(ESP.TextSize - 2, 8)
-    else d.DistanceLabel.Visible = false end
-end
-local function espRemovePlayer(p)
-    if ESPBoxes[p] then for _,l in pairs(ESPBoxes[p]) do l:Remove() end; ESPBoxes[p]=nil end
-    if ESPLabels[p] then ESPLabels[p].Billboard:Destroy(); ESPLabels[p]=nil end
-end
-local function espSetupPlayer(p) if p ~= LP then espCreateBox(p); espCreateLabel(p) end end
-for _, p in ipairs(Players:GetPlayers()) do espSetupPlayer(p) end
-Players.PlayerAdded:Connect(espSetupPlayer)
-Players.PlayerRemoving:Connect(espRemovePlayer)
-RunService.RenderStepped:Connect(function()
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP then espUpdateBox(p); espUpdateLabel(p) end
+local function espUpdateUnit(unit)
+    local model = getUnitModel(unit)
+    if not model then return end
+    if not ESPBoxes[model] then espCreateBox(model) end
+    if not ESPLabels[model] then espCreateLabel(model) end
+    
+    local isFriendly = false
+    if typeof(unit) == "Instance" and unit:IsA("Player") and ESP.TeamCheck and TeamCheck.IsFriendlyPlayer(unit) then
+        isFriendly = true
     end
+
+    local hrp = model:FindFirstChild("HumanoidRootPart")
+    local hum = model:FindFirstChild("Humanoid")
+    if not hrp or not hum or hum.Health <= 0 then
+        for _,l in pairs(ESPBoxes[model]) do l.Visible=false end
+        ESPLabels[model].Billboard.Enabled = false
+        return
+    end
+
+    local d = (hrp.Position - Camera.CFrame.Position).Magnitude
+    local b = ESPBoxes[model]
+    
+    if not ESP.Enabled or not ESP.ShowBox or isFriendly or d > ESP.MaxDistance then
+        for _,l in pairs(b) do l.Visible=false end
+    else
+        local sz = model:GetExtentsSize()
+        local tp = (hrp.CFrame * CFrame.new(0, sz.Y/2, 0)).Position
+        local bp = (hrp.CFrame * CFrame.new(0, -sz.Y/2, 0)).Position
+        local t, to_ = Camera:WorldToViewportPoint(tp)
+        local bt, bo_ = Camera:WorldToViewportPoint(bp)
+        if not to_ or not bo_ or t.Z<=0 or bt.Z<=0 then
+            for _,l in pairs(b) do l.Visible=false end
+        else
+            local h = bt.Y - t.Y
+            local w = h * 0.65
+            local lX, rX = t.X - w/2, t.X + w/2
+            b.Top.From = Vector2.new(lX, t.Y); b.Top.To = Vector2.new(rX, t.Y); b.Top.Visible = true
+            b.Bottom.From = Vector2.new(lX, bt.Y); b.Bottom.To = Vector2.new(rX, bt.Y); b.Bottom.Visible = true
+            b.Left.From = Vector2.new(lX, t.Y); b.Left.To = Vector2.new(lX, bt.Y); b.Left.Visible = true
+            b.Right.From = Vector2.new(rX, t.Y); b.Right.To = Vector2.new(rX, bt.Y); b.Right.Visible = true
+        end
+    end
+
+    local dl = ESPLabels[model]
+    if not ESP.Enabled or isFriendly or (not ESP.ShowName and not ESP.ShowDistance) or d > ESP.MaxDistance then
+        dl.Billboard.Enabled = false
+    else
+        dl.Billboard.Adornee = hrp
+        dl.Billboard.Enabled = true
+        if ESP.ShowName then
+            dl.NameLabel.Visible = true
+            dl.NameLabel.Text = typeof(unit) == "Instance" and unit:IsA("Player") and unit.DisplayName or model.Name
+            dl.NameLabel.TextColor3 = ESP.TextColor
+            dl.NameLabel.TextSize = ESP.TextSize
+        else dl.NameLabel.Visible = false end
+        if ESP.ShowDistance then
+            dl.DistanceLabel.Visible = true
+            dl.DistanceLabel.Text = string.format("[%d]", math.floor(d))
+            dl.DistanceLabel.TextSize = math.max(ESP.TextSize - 2, 8)
+        else dl.DistanceLabel.Visible = false end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    local units = getAllTargets()
+    local activeModels = {}
+    for _, unit in ipairs(units) do
+        local model = getUnitModel(unit)
+        if model then
+            activeModels[model] = true
+            espUpdateUnit(unit)
+        end
+    end
+    for model, _ in pairs(ESPBoxes) do if not activeModels[model] then espRemoveModel(model) end end
 end)
+
 function ESP.SetEnabled(v)
     ESP.Enabled = v
     if not v then
@@ -1270,6 +1306,7 @@ local Chams = { Enabled = false, AlwaysOnTop = false, Outline = false, FillColor
 local ChamsFolder = Instance.new("Folder")
 ChamsFolder.Parent = CoreGui
 local ChamsHighlights = {}
+
 local function chamsApply(hl)
     hl.FillColor = Chams.FillColor
     hl.OutlineColor = Chams.OutlineColor
@@ -1277,37 +1314,58 @@ local function chamsApply(hl)
     hl.OutlineTransparency = Chams.Outline and 0 or 1
     hl.DepthMode = Chams.AlwaysOnTop and Enum.HighlightDepthMode.AlwaysOnTop or Enum.HighlightDepthMode.Occluded
 end
-local function chamsCreate(p)
-    if p == LP or ChamsHighlights[p] then return end
+
+local function chamsCreate(model)
+    if not model or ChamsHighlights[model] then return end
     local hl = Instance.new("Highlight")
     hl.Parent = ChamsFolder
     hl.Enabled = false
     chamsApply(hl)
-    ChamsHighlights[p] = hl
+    ChamsHighlights[model] = hl
 end
-local function chamsRemove(p)
-    if ChamsHighlights[p] then ChamsHighlights[p]:Destroy(); ChamsHighlights[p]=nil end
+
+local function chamsRemoveModel(model)
+    if ChamsHighlights[model] then ChamsHighlights[model]:Destroy(); ChamsHighlights[model]=nil end
 end
-local function chamsUpdate(p)
-    local hl = ChamsHighlights[p]
-    if not hl then return end
-    if Chams.TeamCheck and TeamCheck.IsFriendlyPlayer(p) then hl.Enabled=false; return end
-    if not Chams.Enabled then hl.Enabled=false; return end
-    local c = p.Character
-    if not c then hl.Enabled=false; return end
-    local hum = c:FindFirstChildOfClass("Humanoid")
-    if not hum or hum.Health <= 0 then hl.Enabled=false; return end
-    hl.Adornee = c
+
+local function chamsUpdateUnit(unit)
+    local model = getUnitModel(unit)
+    if not model then return end
+    if not ChamsHighlights[model] then chamsCreate(model) end
+    local hl = ChamsHighlights[model]
+    
+    local isFriendly = false
+    if typeof(unit) == "Instance" and unit:IsA("Player") and Chams.TeamCheck and TeamCheck.IsFriendlyPlayer(unit) then
+        isFriendly = true
+    end
+
+    if not Chams.Enabled or isFriendly then
+        hl.Enabled = false
+        return
+    end
+    local hum = model:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then
+        hl.Enabled = false
+        return
+    end
+    hl.Adornee = model
     hl.Enabled = true
     chamsApply(hl)
 end
-local function chamsSetupPlayer(p) if p ~= LP then chamsCreate(p) end end
-for _, p in ipairs(Players:GetPlayers()) do chamsSetupPlayer(p) end
-Players.PlayerAdded:Connect(chamsSetupPlayer)
-Players.PlayerRemoving:Connect(chamsRemove)
+
 RunService.RenderStepped:Connect(function()
-    for _, p in ipairs(Players:GetPlayers()) do if p ~= LP then chamsUpdate(p) end end
+    local units = getAllTargets()
+    local activeModels = {}
+    for _, unit in ipairs(units) do
+        local model = getUnitModel(unit)
+        if model then
+            activeModels[model] = true
+            chamsUpdateUnit(unit)
+        end
+    end
+    for model, _ in pairs(ChamsHighlights) do if not activeModels[model] then chamsRemoveModel(model) end end
 end)
+
 function Chams.SetEnabled(v)
     Chams.Enabled = v
     if not v then for _,hl in pairs(ChamsHighlights) do hl.Enabled=false end end
@@ -1444,32 +1502,6 @@ local function aaFriendly(unit)
     if not AimAssist.TeamCheck then return false end
     return TeamCheck.IsFriendlyUnit(unit)
 end
-local function aaTargetUnits()
-    local units, seen = {}, {}
-    for _, p in ipairs(Players:GetPlayers()) do if p ~= LP then table.insert(units,p); seen[p]=true end end
-    if not AimAssist.AimBots then return units end
-    local function add(m)
-        if typeof(m) == "Instance" and m:IsA("Model") and not seen[m]
-            and m:GetAttribute("_entity") == "HumanoidEntity"
-            and not Players:GetPlayerFromCharacter(m) then
-            seen[m]=true; table.insert(units,m)
-        end
-    end
-    if EntityAPI and EntityAPI.Entity and type(EntityAPI.Entity.GetAll) == "function" then
-        local ok, reg = pcall(EntityAPI.Entity.GetAll)
-        if ok and type(reg) == "table" then
-            for _,e in pairs(reg._items or reg) do if type(e)=="table" then add(e.Instance) end end
-        end
-    end
-    local worlds = workspace:FindFirstChild("World")
-    if worlds then
-        for _,w in ipairs(worlds:GetChildren()) do
-            local ents = w:FindFirstChild("Entities")
-            if ents then for _,m in ipairs(ents:GetChildren()) do add(m) end end
-        end
-    end
-    return units
-end
 local function aaCandidate(unit)
     if unit == LP or not aaSameRoom(unit) then return nil end
     local model = aaCharacterOf(unit)
@@ -1492,35 +1524,16 @@ local function aaAimOrigin(camera)
     end
     return UIS:GetMouseLocation() - GuiService:GetGuiInset()
 end
-local aaWallParams = RaycastParams.new()
-aaWallParams.FilterType = Enum.RaycastFilterType.Exclude
-aaWallParams.RespectCanCollide = false
-local function aaUpdateWallFilter()
-    local list = {}
-    if LP.Character then table.insert(list, LP.Character) end
-    aaWallParams.FilterDescendantsInstances = list
-end
-aaUpdateWallFilter()
-LP.CharacterAdded:Connect(function() task.wait(0.2); aaUpdateWallFilter() end)
-local function aaCanSee(camera, model, position)
-    if not AimAssist.WallCheck then return true end
-    local origin = camera.CFrame.Position
-    local myC = LP.Character
-    local head = myC and myC:FindFirstChild("Head")
-    local hrp = myC and myC:FindFirstChild("HumanoidRootPart")
-    if head and hrp and (origin - head.Position).Magnitude < 1.5 then origin = hrp.Position + Vector3.new(0,1.5,0) end
-    local dir = position - origin
-    if dir.Magnitude < 0.01 then return true end
-    local hit = workspace:Raycast(origin, dir.Unit * 1000, aaWallParams)
-    return hit and hit.Instance:IsDescendantOf(model) or false
-end
+
+-- ИЗМЕНЕНО: удалены aaWallParams/aaUpdateWallFilter/aaCanSee
+
 local function aaChooseTarget()
     local camera = workspace.CurrentCamera
     if not camera then return nil end
     local origin = aaAimOrigin(camera)
     local best, bestPos, bestPart, score = nil, nil, nil, AimAssist.Radius
     local bestVisible = false
-    for _, unit in ipairs(aaTargetUnits()) do
+    for _, unit in ipairs(getAllTargets(AimAssist.AimBots)) do
         if not aaFriendly(unit) then
             local model, part = aaCandidate(unit)
             if model and part then
@@ -1529,8 +1542,8 @@ local function aaChooseTarget()
                 if visible and point.Z > 0 and (position - camera.CFrame.Position).Magnitude <= AimAssist.MaxDistance then
                     local delta = (Vector2.new(point.X, point.Y) - origin).Magnitude
                     if delta < AimAssist.Radius then
-                        local vS = true
-                        if AimAssist.WallCheck then vS = aaCanSee(camera, model, position) end
+                        -- ИЗМЕНЕНО: используем общий WallCheck
+                        local vS = not AimAssist.WallCheck or WallCheck.CanSee(camera, model, position)
                         local allowed = not AimAssist.WallCheck or vS
                         local pV = vS and not bestVisible
                         local sP = (vS == bestVisible)
@@ -1688,24 +1701,27 @@ end)
 
 local rbCard, rbSet, rbEnable, rbKeybind = buildModule(combat, {
     name = "RageBot", title = "Rage Bot", cardH = 0.17, layoutOrder = 4,
-    titleSize = UDim2.new(0.445, 0, 0.125, 0), titlePos = UDim2.new(0.271, 0, 0.125, 0),
-    enablePos = UDim2.new(0.852, 0, 0.125, 0), enableSize = UDim2.new(0.099, 0, 0.106, 0),
-    keybindPos = UDim2.new(0.675, 0, 0.122, 0), keybindSize = UDim2.new(0.15, 0, 0.099, 0),
-    settingsPos = UDim2.new(0.498, 0, 0.853, 0), settingsSize = UDim2.new(0.999, 0, 1.229, 0),
+    titleSize = UDim2.new(0.445, 0, 0.118, 0), titlePos = UDim2.new(0.271, 0, 0.115, 0),
+    enablePos = UDim2.new(0.852, 0, 0.115, 0), enableSize = UDim2.new(0.099, 0, 0.1, 0),
+    keybindPos = UDim2.new(0.675, 0, 0.112, 0), keybindSize = UDim2.new(0.15, 0, 0.094, 0),
+    settingsPos = UDim2.new(0.496, 0, 0.803, 0), settingsSize = UDim2.new(0.999, 0, 1.16, 0),
     onEnable = function(v) RageBot.Enabled = v end,
 })
 local rbLimitFovState = makeToggleRow(rbSet, "Limit To FOV", 1)
 local rbQuickScopeState = makeToggleRow(rbSet, "Quick Scope", 2)
 local rbTeamState = makeToggleRow(rbSet, "Team Check", 3)
-local rbDistState = makeSliderRow(rbSet, "Distance", 0, 5000, 500, 4, 0, function(v) RageBot.MaxDistance = v end)
+local rbDistState = makeSliderRow(rbSet, "Distance", 0, 5000, 500, 5, 0, function(v) RageBot.MaxDistance = v end)
+local rbVisibleState = makeToggleRow(rbSet, "VIsible Check", 4)
 RageBot.MaxDistance = rbDistState.Value
 RageBot.LimitToFOV = rbLimitFovState.Enabled
 RageBot.QuickScope = rbQuickScopeState.Enabled
 RageBot.TeamCheck = rbTeamState.Enabled
+RageBot.WallCheck = rbVisibleState.Enabled
 RunService.Heartbeat:Connect(function()
     RageBot.LimitToFOV = rbLimitFovState.Enabled
     RageBot.QuickScope = rbQuickScopeState.Enabled
     RageBot.TeamCheck = rbTeamState.Enabled
+    RageBot.WallCheck = rbVisibleState.Enabled
     RageBot.MaxDistance = rbDistState.Value
     if AimAssist and AimAssist.Radius then RageBot.FOVRadius = AimAssist.Radius end
 end)
@@ -1723,7 +1739,7 @@ task.spawn(function()
                 local bestUnit, bestPart = nil, nil
                 local bestDist = RageBot.LimitToFOV and RageBot.FOVRadius or math.huge
                 local maxDist = RageBot.MaxDistance
-                for _, unit in ipairs(aaTargetUnits()) do
+                for _, unit in ipairs(getAllTargets(true)) do
                     if not (RageBot.TeamCheck and TeamCheck.IsFriendlyUnit(unit)) then
                         local model, part = aaCandidate(unit)
                         if model and part then
@@ -1734,7 +1750,8 @@ task.spawn(function()
                                 if onScreen and point.Z > 0 then
                                     local delta = (Vector2.new(point.X, point.Y) - origin).Magnitude
                                     if delta < bestDist then
-                                        if not RageBot.WallCheck or aaCanSee(camera, model, pos) then
+                                        -- ИЗМЕНЕНО: используем общий WallCheck
+                                        if not RageBot.WallCheck or WallCheck.CanSee(camera, model, pos) then
                                             bestUnit, bestPart = unit, part
                                             bestDist = delta
                                         end
@@ -1905,7 +1922,8 @@ registerState("trigger_keybind", tbKeybind)
 
 registerState("rage_enabled", rbEnable); registerState("rage_limitfov", rbLimitFovState)
 registerState("rage_quickscope", rbQuickScopeState); registerState("rage_team", rbTeamState)
-registerState("rage_distance", rbDistState); registerState("rage_keybind", rbKeybind)
+registerState("rage_visible", rbVisibleState); registerState("rage_distance", rbDistState)
+registerState("rage_keybind", rbKeybind)
 
 registerState("esp_enabled", espEnable); registerState("esp_box", espBoxState)
 registerState("esp_name", espNameState); registerState("esp_distance", espDistState)
