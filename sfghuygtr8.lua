@@ -699,6 +699,7 @@ local function makeDropdownRow(parent, titleText, defaultText, order, onChange, 
     local function makeOpt(name, optOrder)
         local btn = Instance.new("TextButton", dvar)
         btn.BackgroundColor3 = Color3.fromRGB(66, 66, 66)
+        btn.TextColor3 = Color3.fromRGB(255,255,255)
         btn.TextScaled = true
         btn.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
         btn.Size = UDim2.new(1, 0, 1, 0)
