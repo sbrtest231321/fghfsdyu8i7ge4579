@@ -668,6 +668,7 @@ local function makeDropdownRow(parent, titleText, defaultText, order, onChange, 
     dropdown.TextScaled = true
     dropdown.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Regular, Enum.FontStyle.Normal)
     dropdown.Text = defaultText
+    dropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
     dropdown.Position = UDim2.new(0.5, 0, 1.583, 0)
     dropdown.ZIndex = 11
     Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0.2, 0)
