@@ -1394,7 +1394,7 @@ local function doKeyRelease(vkCode)
     end
 end
 
--- ИЗМЕНЕНО: Добавлена логика Bypass в Speed
+-- ИЗМЕНЕНО: Добавлена логика Bypass в Speed (включая метод Jump)
 local Speed = { Enabled = false, Amount = 50, BypassMethod = "None", _conn = nil, _isPulsing = false }
 function Speed.stop() 
     if Speed._conn then Speed._conn:Disconnect(); Speed._conn = nil end 
@@ -1410,6 +1410,12 @@ function Speed.start()
         local hrp = c:FindFirstChild("HumanoidRootPart")
         local h = c:FindFirstChildOfClass("Humanoid")
         if not hrp or not h then return end
+        
+        -- Bypass Jump: постоянный прыжок
+        if Speed.BypassMethod == "Jump" then
+            h.Jump = true
+        end
+
         local hv = Vector3.zero
         if h.MoveDirection.Magnitude > 0 then hv = h.MoveDirection * (Speed.Amount/50) * 60 end
         
@@ -1854,8 +1860,8 @@ local spdCard, spdSet, spdEnable, spdKeybind = buildModule(movement, {
 local spdSliderState = makeSliderRow(spdSet, "Amount", 0, 500, 50, 5, 0, function(v) Speed.Amount = v end)
 Speed.Amount = spdSliderState.Value
 
--- ИЗМЕНЕНО: Добавлен дропдаун Bypass Method для Speed
-local spdBypassState = makeDropdownRow(spdSet, "Bypass Method", "None", 6, function(val) Speed.BypassMethod = val end, {"None", "Slide", "Pulse"})
+-- ИЗМЕНЕНО: Добавлен метод Jump в дропдаун Bypass Method
+local spdBypassState = makeDropdownRow(spdSet, "Bypass Method", "None", 6, function(val) Speed.BypassMethod = val end, {"None", "Slide", "Pulse", "Jump"})
 Speed.BypassMethod = spdBypassState.Value
 
 local flyCard, flySet, flyEnable, flyKeybind = buildModule(movement, {
