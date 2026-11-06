@@ -1469,6 +1469,7 @@ function Fly.start()
         if h.MoveDirection.Magnitude > 0 then hv = h.MoveDirection * (Fly.Speed/50) * 60 end
         local vert = 0
         if UIS:IsKeyDown(Enum.KeyCode.E) then vert = vert + 1 end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then vert = vert + 1 end
         if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then vert = vert - 1 end
         if vert ~= 0 then
             local vs = vert * (Fly.VerticalSpeed/50) * (dt*60)
