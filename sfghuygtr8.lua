@@ -1394,10 +1394,12 @@ local function doKeyRelease(vkCode)
     end
 end
 
-local Speed = { Enabled = false, Amount = 50, BypassMethod = "None", _conn = nil, _isPulsing = false }
+-- ИЗМЕНЕНО: Добавлен метод Smooth + байпасы работают только при движении
+local Speed = { Enabled = false, Amount = 50, BypassMethod = "None", _conn = nil, _isPulsing = false, _smoothMultiplier = 0 }
 function Speed.stop() 
     if Speed._conn then Speed._conn:Disconnect(); Speed._conn = nil end 
     Speed._isPulsing = false
+    Speed._smoothMultiplier = 0
     doKeyRelease(0x11)
 end
 function Speed.start()
@@ -1412,15 +1414,30 @@ function Speed.start()
         
         local isMoving = h.MoveDirection.Magnitude > 0.01
         
+        -- Bypass Jump: постоянный прыжок только при движении
         if Speed.BypassMethod == "Jump" and isMoving then
             h.Jump = true
         end
 
+        -- Bypass Smooth: плавное нарастание скорости от 0 до максимума
+        if Speed.BypassMethod == "Smooth" then
+            if isMoving then
+                -- ~0.67 сек до полной скорости (dt * 1.5)
+                Speed._smoothMultiplier = math.min(Speed._smoothMultiplier + dt * 1.5, 1)
+            else
+                -- Быстрый сброс при остановке (dt * 3)
+                Speed._smoothMultiplier = math.max(Speed._smoothMultiplier - dt * 3, 0)
+            end
+        else
+            Speed._smoothMultiplier = 1
+        end
+
         local hv = Vector3.zero
         if isMoving then
-            hv = h.MoveDirection * (Speed.Amount / 50) * 60
+            hv = h.MoveDirection * (Speed.Amount / 50) * 60 * Speed._smoothMultiplier
         end
         
+        -- Bypass Pulse: остановка движения только когда игрок двигается
         if Speed.BypassMethod == "Pulse" and Speed._isPulsing and isMoving then
             hv = Vector3.zero
         end
@@ -1428,6 +1445,7 @@ function Speed.start()
         hrp.AssemblyLinearVelocity = Vector3.new(hv.X, hrp.AssemblyLinearVelocity.Y, hv.Z)
     end)
     
+    -- Bypass Slide & Pulse логика таймеров (работает только при движении)
     task.spawn(function()
         local lastSlide = 0
         local lastPulse = 0
@@ -1874,7 +1892,7 @@ local spdSliderState = makeSliderRow(spdSet, "Amount", 0, 500, 50, 5, 0, functio
 Speed.Amount = spdSliderState.Value
 
 -- ИЗМЕНЕНО: Добавлен метод Jump в дропдаун Bypass Method
-local spdBypassState = makeDropdownRow(spdSet, "Bypass Method", "None", 6, function(val) Speed.BypassMethod = val end, {"None", "Slide", "Pulse", "Jump"})
+local spdBypassState = makeDropdownRow(spdSet, "Bypass Method", "None", 6, function(val) Speed.BypassMethod = val end, {"None", "Slide", "Pulse", "Jump", "Smooth"})
 Speed.BypassMethod = spdBypassState.Value
 
 local flyCard, flySet, flyEnable, flyKeybind = buildModule(movement, {
