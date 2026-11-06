@@ -1109,15 +1109,6 @@ do
                         choice = { unit = unit, position = position, part = part, name = name }
                         Stats.lastTarget = (typeof(unit) == "Instance" and unit.Name) or tostring(unit)
                         Stats.lastPart = name
-                        
-                        -- ИЗМЕНЕНО: создаём трассер
-                        if Config.tracersEnabled then
-                            local cam = workspace.CurrentCamera
-                            if cam then
-                                local fromPos = cam.CFrame.Position + Vector3.new(0, -0.5, 0)
-                                spawnTracer(fromPos, position)
-                            end
-                        end
                     end
                 end
                 if choice and Config.noDelay and type(self._LastShootTime) == "number"
@@ -1152,6 +1143,16 @@ do
                 silentDepth -= 1
                 silentChoice = previous
                 if not result[1] then error(result[2], 0) end
+
+                -- ИЗМЕНЕНО: создаём трассер только если выстрел реально прошёл
+                if choice and Config.tracersEnabled and result[2] then
+                    local cam = workspace.CurrentCamera
+                    if cam then
+                        local fromPos = cam.CFrame.Position + Vector3.new(0, -0.5, 0)
+                        spawnTracer(fromPos, choice.position)
+                    end
+                end
+
                 return table.unpack(result, 2, result.n)
             end)
             table.insert(silentHooks, shootable.LocalShoot)
