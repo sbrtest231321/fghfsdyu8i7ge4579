@@ -887,6 +887,7 @@ do
         maxDistance = 1500, noDelay = false,
         fovRadius = 120, fovCircleRadius = 120, fovEnabled = true, fovVisible = true,
         fovColor = Color3.fromRGB(255, 0, 0), fovThickness = 1.5, fovTransparency = 0.7,
+        tracersEnabled = true
     }
     local alive = true
     local Stats = { installed = false, error = nil, lastTarget = nil, lastPart = nil, hooks = 0, fovFiltered = 0 }
@@ -1017,6 +1018,45 @@ do
         Stats.installed = false; Stats.hooks = 0
         if aimCircle then aimCircle.Visible = false end
     end
+
+        local TracerFolder = Instance.new("Folder")
+    TracerFolder.Name = "VoxerTracers"
+    TracerFolder.Parent = workspace
+    
+    local function spawnTracer(fromPos, toPos)
+        local dir = toPos - fromPos
+        local dist = dir.Magnitude
+        if dist < 0.1 then return end
+        
+        local mid = fromPos + dir * 0.5
+        
+        local part = Instance.new("Part")
+        part.Name = "VoxerTracer"
+        part.Anchored = true
+        part.CanCollide = false
+        part.CanQuery = false
+        part.CanTouch = false
+        part.CastShadow = false
+        part.Material = Enum.Material.Neon
+        part.Color = Color3.fromRGB(255, 255, 255)
+        part.Transparency = 0
+        part.Size = Vector3.new(0.2, 0.2, dist)
+        part.CFrame = CFrame.lookAt(mid, toPos)
+        part.Parent = TracerFolder
+        
+        task.delay(0.5, function()
+            if not part or not part.Parent then return end
+            local tween = TweenService:Create(part, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = Vector3.new(0, 0, dist),
+                Transparency = 1,
+            })
+            tween:Play()
+            tween.Completed:Once(function()
+                if part then part:Destroy() end
+            end)
+        end)
+    end
+    
     local function installSilent()
         if #silentHooks > 0 then return true end
         local hook = getgenv().hookfunction or (type(hookfunction) == "function" and hookfunction)
@@ -1069,6 +1109,15 @@ do
                         choice = { unit = unit, position = position, part = part, name = name }
                         Stats.lastTarget = (typeof(unit) == "Instance" and unit.Name) or tostring(unit)
                         Stats.lastPart = name
+                        
+                        -- ИЗМЕНЕНО: создаём трассер
+                        if Config.tracersEnabled then
+                            local cam = workspace.CurrentCamera
+                            if cam then
+                                local fromPos = cam.CFrame.Position + Vector3.new(0, -0.5, 0)
+                                spawnTracer(fromPos, position)
+                            end
+                        end
                     end
                 end
                 if choice and Config.noDelay and type(self._LastShootTime) == "number"
@@ -1722,26 +1771,29 @@ local saCard, saSet, saEnable, saKeybind = buildModule(combat, {
 local saFovState = makeSliderRow(saSet, "FOV", 0, 1000, 100, 1, 0, function(v) if SilentAim.API then SilentAim.API.SetFovRadius(v) end end)
 local saShowFovState = makeToggleRow(saSet, "Show FOV", 2)
 local saVisibleState = makeToggleRow(saSet, "VIsible Check", 3)
-local saTeamState = makeToggleRow(saSet, "Team Check", 4)
-local saDistState = makeSliderRow(saSet, "Distance", 0, 5000, 500, 5, 0, function(v) if SilentAim.API then SilentAim.API.Config.maxDistance = v end end)
+local saTeamState = makeToggleRow(saSet, "Team Check", 5)
+local saDistState = makeSliderRow(saSet, "Distance", 0, 5000, 500, 6, 0, function(v) if SilentAim.API then SilentAim.API.Config.maxDistance = v end end)
 local function saApplyHitPart(val)
     if not SilentAim.API then return end
     if val == "Closest" or val == "Head, Torso" then SilentAim.API.SetAimParts({"Head","UpperTorso","HumanoidRootPart"})
     elseif val == "Head" then SilentAim.API.SetAimParts({"Head"})
     elseif val == "Torso" then SilentAim.API.SetAimParts({"UpperTorso"}) end
 end
-local saHitPartState = makeDropdownRow(saSet, "Hit Part", "Head, Torso", 6, saApplyHitPart)
+local saHitPartState = makeDropdownRow(saSet, "Hit Part", "Head, Torso", 7, saApplyHitPart)
 saApplyHitPart(saHitPartState.Value)
+local saTracerState = makeToggleRow(saSet, "Tracers", 4) -- ИЗМЕНЕНО
 if SilentAim.API then
     SilentAim.API.SetFovRadius(saFovState.Value)
     SilentAim.API.SetFovVisible(saShowFovState.Enabled)
     SilentAim.API.Config.wallCheck = saVisibleState.Enabled
     SilentAim.API.Config.teamCheck = saTeamState.Enabled
     SilentAim.API.Config.maxDistance = saDistState.Value
+    SilentAim.API.Config.tracersEnabled = saTracerState.Enabled -- ИЗМЕНЕНО
     RunService.Heartbeat:Connect(function()
         SilentAim.API.Config.wallCheck = saVisibleState.Enabled
         SilentAim.API.Config.teamCheck = saTeamState.Enabled
         SilentAim.API.Config.maxDistance = saDistState.Value
+        SilentAim.API.Config.tracersEnabled = saTracerState.Enabled -- ИЗМЕНЕНО
         SilentAim.API.SetFovVisible(saShowFovState.Enabled)
     end)
 end
@@ -2017,6 +2069,7 @@ registerState("silent_enabled", saEnable); registerState("silent_fov", saFovStat
 registerState("silent_showfov", saShowFovState); registerState("silent_visible", saVisibleState)
 registerState("silent_team", saTeamState); registerState("silent_distance", saDistState)
 registerState("silent_hitpart", saHitPartState); registerState("silent_keybind", saKeybind)
+registerState("silent_tracers", saTracerState)
 
 registerState("aim_enabled", aaEnable); registerState("aim_fov", aaFovState)
 registerState("aim_showfov", aaShowFovState); registerState("aim_visible", aaVisibleState)
