@@ -1394,7 +1394,6 @@ local function doKeyRelease(vkCode)
     end
 end
 
--- ИЗМЕНЕНО: Добавлена логика Bypass в Speed (включая метод Jump)
 local Speed = { Enabled = false, Amount = 50, BypassMethod = "None", _conn = nil, _isPulsing = false }
 function Speed.stop() 
     if Speed._conn then Speed._conn:Disconnect(); Speed._conn = nil end 
@@ -1411,48 +1410,62 @@ function Speed.start()
         local h = c:FindFirstChildOfClass("Humanoid")
         if not hrp or not h then return end
         
-        -- Bypass Jump: постоянный прыжок
-        if Speed.BypassMethod == "Jump" then
+        local isMoving = h.MoveDirection.Magnitude > 0.01
+        
+        if Speed.BypassMethod == "Jump" and isMoving then
             h.Jump = true
         end
 
         local hv = Vector3.zero
-        if h.MoveDirection.Magnitude > 0 then hv = h.MoveDirection * (Speed.Amount/50) * 60 end
+        if isMoving then
+            hv = h.MoveDirection * (Speed.Amount / 50) * 60
+        end
         
-        -- Bypass Pulse: остановка движения
-        if Speed.BypassMethod == "Pulse" and Speed._isPulsing then
+        if Speed.BypassMethod == "Pulse" and Speed._isPulsing and isMoving then
             hv = Vector3.zero
         end
         
         hrp.AssemblyLinearVelocity = Vector3.new(hv.X, hrp.AssemblyLinearVelocity.Y, hv.Z)
     end)
     
-    -- Bypass Slide & Pulse логика таймеров
     task.spawn(function()
         local lastSlide = 0
         local lastPulse = 0
         while Speed.Enabled do
             local now = os.clock()
-            if Speed.BypassMethod == "Slide" then
-                if now - lastSlide >= 1.5 then
-                    lastSlide = now
-                    doKeyPress(0x11)
-                    task.wait(0.5)
-                    doKeyRelease(0x11)
-                else
-                    task.wait(0.1)
-                end
-            elseif Speed.BypassMethod == "Pulse" then
-                if now - lastPulse >= 1 then
-                    lastPulse = now
-                    Speed._isPulsing = true
-                    task.wait(.3)
-                    Speed._isPulsing = false
+            local char = LP.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local isMoving = hum and hum.MoveDirection.Magnitude > 0.01
+            
+            if isMoving then
+                if Speed.BypassMethod == "Slide" then
+                    if now - lastSlide >= 1.5 then
+                        lastSlide = now
+                        doKeyPress(0x11)
+                        task.wait(0.5)
+                        doKeyRelease(0x11)
+                    else
+                        task.wait(0.1)
+                    end
+                elseif Speed.BypassMethod == "Pulse" then
+                    if now - lastPulse >= 1 then
+                        lastPulse = now
+                        Speed._isPulsing = true
+                        task.wait(.3)
+                        Speed._isPulsing = false
+                    else
+                        task.wait(0.1)
+                    end
                 else
                     task.wait(0.1)
                 end
             else
+                lastSlide = now
+                lastPulse = now
                 Speed._isPulsing = false
+                if Speed.BypassMethod == "Slide" then
+                    doKeyRelease(0x11)
+                end
                 task.wait(0.1)
             end
         end
