@@ -451,7 +451,7 @@ local SilentAim = (function()
                 if choice and Config.tracersEnabled and result[2] then
                     local myChar = LP.Character
                     local head = myChar and myChar:FindFirstChild("Head")
-                    if head then spawnTracer(head.Position, choice.position) end
+                    if head then spawnTracer(head.Position - Vector3.new(0, 0.5,0), choice.position) end
                 end
                 return table.unpack(result, 2, result.n)
             end)
