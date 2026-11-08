@@ -1,3 +1,6 @@
+-- ui.lua — UI-каркас Voxer Admin
+-- Возвращает таблицу с хелперами и ссылками на элементы UI
+
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -659,7 +662,6 @@ end
 
 -- ========== ГЛОБАЛЬНЫЕ ОБРАБОТЧИКИ UI ==========
 
--- Drag (в IIFE, чтобы не забивать регистры)
 ;(function()
     local dragging, dragStart, startPos
     mainTitle.InputBegan:Connect(function(input)
@@ -680,7 +682,6 @@ end
     end)
 end)()
 
--- Toggle menu (Insert / RightShift)
 ;(function()
     local panelVisible = true
     local TOGGLE_KEYS = { [Enum.KeyCode.Insert] = true, [Enum.KeyCode.RightShift] = true }
@@ -696,7 +697,6 @@ end)()
     end)
 end)()
 
--- Keybind нажатия
 ;(function()
     UIS.InputBegan:Connect(function(input, processed)
         if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
