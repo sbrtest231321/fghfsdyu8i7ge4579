@@ -26,6 +26,7 @@ local LP = Players.LocalPlayer
 local GuiService = game:GetService("GuiService")
 local TweenService = game:GetService("TweenService")
 
+-- Загрузка UI
 local UI_URL = "https://raw.githubusercontent.com/sbrtest231321/fghfsdyu8i7ge4579/refs/heads/main/ui.lua"
 local UI = loadstring(game:HttpGet(UI_URL, true))()
 
@@ -46,7 +47,7 @@ local selectTab = UI.selectTab
 local CONFIG_FILE = UI.CONFIG_FILE
 local AUTO_SAVE_INTERVAL = UI.AUTO_SAVE_INTERVAL
 
--- ========== SHARED HELPERS (в IIFE чтобы не забивать регистры) ==========
+-- ========== SHARED HELPERS ==========
 local TeamCheck, WallCheck, EntityAPI, getUnitModel, getAllTargets, aaCharacterOf, aaHealthOf, aaSameRoom, aaCandidate =
 (function()
     local EntityAPI
@@ -58,7 +59,6 @@ local TeamCheck, WallCheck, EntityAPI, getUnitModel, getAllTargets, aaCharacterO
             if ok then EntityAPI = value end
         end
     end
-
     local TeamCheck = {
         IsFriendlyPlayer = function(player)
             if player == LP then return true end
@@ -82,7 +82,6 @@ local TeamCheck, WallCheck, EntityAPI, getUnitModel, getAllTargets, aaCharacterO
             return false
         end,
     }
-
     local WallCheck = {}
     local wallCheckParams = RaycastParams.new()
     wallCheckParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -110,28 +109,23 @@ local TeamCheck, WallCheck, EntityAPI, getUnitModel, getAllTargets, aaCharacterO
         if not hit then return true end
         return hit.Instance:IsDescendantOf(model) or hit.Instance == model
     end
-
     local function getUnitModel(unit)
         if typeof(unit) == "Instance" and unit:IsA("Model") then return unit end
         if unit.Character then return unit.Character end
         return nil
     end
-
     local function getAllTargets(includeBots)
         if includeBots == nil then includeBots = true end
         local units, seen = {}, {}
         for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LP then
-                table.insert(units, p); seen[p] = true
-            end
+            if p ~= LP then table.insert(units, p); seen[p] = true end
         end
         if not includeBots then return units end
         local function add(m)
             if typeof(m) == "Instance" and m:IsA("Model") and not seen[m]
                 and m:GetAttribute("_entity") == "HumanoidEntity"
                 and not Players:GetPlayerFromCharacter(m) then
-                seen[m] = true
-                table.insert(units, m)
+                seen[m] = true; table.insert(units, m)
             end
         end
         if EntityAPI and EntityAPI.Entity and type(EntityAPI.Entity.GetAll) == "function" then
@@ -149,7 +143,6 @@ local TeamCheck, WallCheck, EntityAPI, getUnitModel, getAllTargets, aaCharacterO
         end
         return units
     end
-
     local function aaFinite(n) return type(n) == "number" and n == n and math.abs(n) < 1e6 end
     local function aaValidPos(p) return typeof(p) == "Vector3" and aaFinite(p.X) and aaFinite(p.Y) and aaFinite(p.Z) end
     local function aaCharacterOf(unit)
@@ -191,7 +184,6 @@ local TeamCheck, WallCheck, EntityAPI, getUnitModel, getAllTargets, aaCharacterO
         if not part or not part:IsA("BasePart") or not aaValidPos(part.Position) then return nil end
         return model, part
     end
-
     return TeamCheck, WallCheck, EntityAPI, getUnitModel, getAllTargets, aaCharacterOf, aaHealthOf, aaSameRoom, aaCandidate
 end)()
 
@@ -841,7 +833,6 @@ local AimAssist = (function()
     Instance.new("UICorner", fovCircle).CornerRadius = UDim.new(0.5, 0)
     local fovStroke = Instance.new("UIStroke", fovCircle)
     fovStroke.Color = Color3.fromRGB(0, 255, 100); fovStroke.Thickness = 1.5; fovStroke.Transparency = 0.15
-
     local function friendly(unit)
         if not self.TeamCheck then return false end
         return TeamCheck.IsFriendlyUnit(unit)
@@ -1163,10 +1154,10 @@ end)()
     end)
 end)()
 
--- ========== UI SETUP (в IIFE чтобы не забивать регистры) ==========
+-- ========== UI SETUP ==========
+
 ;(function()
-    -- SILENT AIM UI
-    local _, saSet = buildModule(tabFrames.Combat, {
+    local _, saSet, saEnable, saKeybind = buildModule(tabFrames.Combat, {
         name="SilentAim", title="Silent Aim", cardH=0.25, layoutOrder=1,
         titleSize=UDim2.new(0.4464,0,0.08639,0), titlePos=UDim2.new(0.27153,0,0.08598,0),
         enablePos=UDim2.new(0.85341,0,0.0858,0), enableSize=UDim2.new(0.1,0,0.074,0),
@@ -1196,6 +1187,15 @@ end)()
     end
     local saHitPartState = makeDropdownRow(saSet, "Hit Part", "Head, Torso", 7, saApplyHitPart)
     saApplyHitPart(saHitPartState.Value)
+    registerState("silent_enabled", saEnable)
+    registerState("silent_fov", saFovState)
+    registerState("silent_showfov", saShowFovState)
+    registerState("silent_visible", saVisibleState)
+    registerState("silent_tracers", saTracerState)
+    registerState("silent_team", saTeamState)
+    registerState("silent_distance", saDistState)
+    registerState("silent_hitpart", saHitPartState)
+    registerState("silent_keybind", saKeybind)
     SilentAim.API.SetFovRadius(saFovState.Value)
     SilentAim.API.SetFovVisible(saShowFovState.Enabled)
     SilentAim.API.Config.wallCheck = saVisibleState.Enabled
@@ -1209,16 +1209,10 @@ end)()
         SilentAim.API.Config.tracersEnabled = saTracerState.Enabled
         SilentAim.API.SetFovVisible(saShowFovState.Enabled)
     end)
-    -- Регистрация ключей конфига (устанавливаем через первый buildModule)
-    local saEnable = nil
-    -- saEnable возвращается из buildModule но мы её не поймали; перезапишем через registry не нужно, buildModule уже пушит в keybindRegistry
-    -- Всё, что нужно снаружи — store в state:
-    SilentAim._UI = { saFov=saFovState, saShowFov=saShowFovState, saVisible=saVisibleState, saTracer=saTracerState, saTeam=saTeamState, saDist=saDistState, saHitPart=saHitPartState }
 end)()
 
--- Остальные UI создаём так же, в отдельных IIFE
 ;(function()
-    local _, aaSet = buildModule(tabFrames.Combat, {
+    local _, aaSet, aaEnable, aaKeybind = buildModule(tabFrames.Combat, {
         name="AimAssist", title="Aim Assist", cardH=0.27, layoutOrder=2,
         titleSize=UDim2.new(0.44479,0,0.07877,0), titlePos=UDim2.new(0.27096,0,0.07877,0),
         enablePos=UDim2.new(0.85208,0,0.07877,0), enableSize=UDim2.new(0.09884,0,0.06665,0),
@@ -1242,6 +1236,15 @@ end)()
     end
     local aaHitPartState = makeDropdownRow(aaSet, "Hit Part", "Head, Torso", 7, aaApplyHitPart)
     aaApplyHitPart(aaHitPartState.Value)
+    registerState("aim_enabled", aaEnable)
+    registerState("aim_fov", aaFovState)
+    registerState("aim_showfov", aaShowFovState)
+    registerState("aim_visible", aaVisibleState)
+    registerState("aim_team", aaTeamState)
+    registerState("aim_distance", aaDistState)
+    registerState("aim_smooth", aaSmoothState)
+    registerState("aim_hitpart", aaHitPartState)
+    registerState("aim_keybind", aaKeybind)
     AimAssist.ShowFOV = aaShowFovState.Enabled
     AimAssist.WallCheck = aaVisibleState.Enabled
     AimAssist.TeamCheck = aaTeamState.Enabled
@@ -1256,7 +1259,7 @@ end)()
 end)()
 
 ;(function()
-    local _, tbSet = buildModule(tabFrames.Combat, {
+    local _, tbSet, tbEnable, tbKeybind = buildModule(tabFrames.Combat, {
         name="TriggerBot", title="Trigger Bot", cardH=0.14, layoutOrder=3,
         titleSize=UDim2.new(0.44479,0,0.15191,0), titlePos=UDim2.new(0.27096,0,0.15191,0),
         enablePos=UDim2.new(0.85208,0,0.15191,0), enableSize=UDim2.new(0.09884,0,0.12854,0),
@@ -1267,6 +1270,11 @@ end)()
     local tbVisibleState = makeToggleRow(tbSet, "VIsible Check", 3)
     local tbTeamState = makeToggleRow(tbSet, "Team Check", 4)
     local tbDistState = makeSliderRow(tbSet, "Distance", 0, 5000, 500, 5, 0, function(v) TriggerBot.MaxDistance = v end)
+    registerState("trigger_enabled", tbEnable)
+    registerState("trigger_visible", tbVisibleState)
+    registerState("trigger_team", tbTeamState)
+    registerState("trigger_distance", tbDistState)
+    registerState("trigger_keybind", tbKeybind)
     TriggerBot.MaxDistance = tbDistState.Value
     TriggerBot.VisibleCheck = tbVisibleState.Enabled
     TriggerBot.TeamCheck = tbTeamState.Enabled
@@ -1278,7 +1286,7 @@ end)()
 end)()
 
 ;(function()
-    local _, rbSet = buildModule(tabFrames.Combat, {
+    local _, rbSet, rbEnable, rbKeybind = buildModule(tabFrames.Combat, {
         name="RageBot", title="Rage Bot", cardH=0.17, layoutOrder=4,
         titleSize=UDim2.new(0.445,0,0.125,0), titlePos=UDim2.new(0.271,0,0.125,0),
         enablePos=UDim2.new(0.852,0,0.125,0), enableSize=UDim2.new(0.099,0,0.106,0),
@@ -1291,6 +1299,13 @@ end)()
     local rbTeamState = makeToggleRow(rbSet, "Team Check", 3)
     local rbDistState = makeSliderRow(rbSet, "Distance", 0, 5000, 500, 4, 0, function(v) RageBot.MaxDistance = v end)
     local rbVisibleState = makeToggleRow(rbSet, "VIsible Check", 5)
+    registerState("rage_enabled", rbEnable)
+    registerState("rage_limitfov", rbLimitFovState)
+    registerState("rage_quickscope", rbQuickScopeState)
+    registerState("rage_team", rbTeamState)
+    registerState("rage_distance", rbDistState)
+    registerState("rage_visible", rbVisibleState)
+    registerState("rage_keybind", rbKeybind)
     RageBot.MaxDistance = rbDistState.Value
     RageBot.LimitToFOV = rbLimitFovState.Enabled
     RageBot.QuickScope = rbQuickScopeState.Enabled
@@ -1306,7 +1321,7 @@ end)()
 end)()
 
 ;(function()
-    local _, spdSet = buildModule(tabFrames.Movement, {
+    local _, spdSet, spdEnable, spdKeybind = buildModule(tabFrames.Movement, {
         name="Speed", title="Speed", cardH=0.09, layoutOrder=1,
         titleSize=UDim2.new(0.44479,0,0.2363,0), titlePos=UDim2.new(0.27096,0,0.2363,0),
         enablePos=UDim2.new(0.85208,0,0.2363,0), enableSize=UDim2.new(0.09884,0,0.19994,0),
@@ -1318,10 +1333,14 @@ end)()
     Speed.Amount = spdSliderState.Value
     local spdBypassState = makeDropdownRow(spdSet, "Bypass Method", "None", 6, function(val) Speed.BypassMethod = val end, {"None", "Slide", "Pulse", "Jump", "Smooth"})
     Speed.BypassMethod = spdBypassState.Value
+    registerState("speed_enabled", spdEnable)
+    registerState("speed_amount", spdSliderState)
+    registerState("speed_bypass", spdBypassState)
+    registerState("speed_keybind", spdKeybind)
 end)()
 
 ;(function()
-    local _, flySet = buildModule(tabFrames.Movement, {
+    local _, flySet, flyEnable, flyKeybind = buildModule(tabFrames.Movement, {
         name="Fly", title="Fly", cardH=0.11, layoutOrder=2,
         titleSize=UDim2.new(0.445,0,0.193,0), titlePos=UDim2.new(0.271,0,0.188,0),
         enablePos=UDim2.new(0.852,0,0.188,0), enableSize=UDim2.new(0.099,0,0.164,0),
@@ -1333,10 +1352,14 @@ end)()
     Fly.Speed = flySpeedState.Value
     local flyVertState = makeSliderRow(flySet, "Vertical Speed", 0, 500, 50, 5, 0, function(v) Fly.VerticalSpeed = v end)
     Fly.VerticalSpeed = flyVertState.Value
+    registerState("fly_enabled", flyEnable)
+    registerState("fly_speed", flySpeedState)
+    registerState("fly_vertical", flyVertState)
+    registerState("fly_keybind", flyKeybind)
 end)()
 
 ;(function()
-    local _, lnSet = buildModule(tabFrames.Utilities, {
+    local _, lnSet, lnEnable, lnKeybind = buildModule(tabFrames.Utilities, {
         name="LongNeck", title="Long Neck", cardH=0.07, layoutOrder=1,
         titleSize=UDim2.new(0.445,0,0.304,0), titlePos=UDim2.new(0.271,0,0.296,0),
         enablePos=UDim2.new(0.852,0,0.296,0), enableSize=UDim2.new(0.099,0,0.257,0),
@@ -1349,10 +1372,13 @@ end)()
         if LongNeck._holding and LongNeck._baseY then LongNeck._targetY = LongNeck._baseY + v end
     end)
     LongNeck.LiftAmount = lnSliderState.Value
+    registerState("neck_enabled", lnEnable)
+    registerState("neck_distance", lnSliderState)
+    registerState("neck_keybind", lnKeybind)
 end)()
 
 ;(function()
-    local _, tpSet = buildModule(tabFrames.Utilities, {
+    local _, tpSet, tpEnable, tpKeybind = buildModule(tabFrames.Utilities, {
         name="ThirdPerson", title="Third Person", cardH=0.09, layoutOrder=2,
         titleSize=UDim2.new(0.445,0,0.2363,0), titlePos=UDim2.new(0.271,0,0.2363,0),
         enablePos=UDim2.new(0.852,0,0.2363,0), enableSize=UDim2.new(0.099,0,0.19994,0),
@@ -1360,10 +1386,12 @@ end)()
         settingsPos=UDim2.new(0.499,0,1.61168,0), settingsSize=UDim2.new(0.998,0,2.32057,0),
         onEnable=function(v) ThirdPerson.Enabled = v; if v then ThirdPerson.start() else ThirdPerson.stop() end end,
     })
+    registerState("tp_enabled", tpEnable)
+    registerState("tp_keybind", tpKeybind)
 end)()
 
 ;(function()
-    local _, espSet = buildModule(tabFrames.Render, {
+    local _, espSet, espEnable, espKeybind = buildModule(tabFrames.Render, {
         name="ESP", title="ESP", cardH=0.16, layoutOrder=1,
         titleSize=UDim2.new(0.44479,0,0.13292,0), titlePos=UDim2.new(0.27096,0,0.12951,0),
         enablePos=UDim2.new(0.85208,0,0.12951,0), enableSize=UDim2.new(0.09884,0,0.11247,0),
@@ -1375,6 +1403,12 @@ end)()
     local espNameState = makeToggleRow(espSet, "Name", 1)
     local espDistState = makeToggleRow(espSet, "Distance", 2)
     local espTeamState = makeToggleRow(espSet, "Team Check", 3)
+    registerState("esp_enabled", espEnable)
+    registerState("esp_box", espBoxState)
+    registerState("esp_name", espNameState)
+    registerState("esp_distance", espDistState)
+    registerState("esp_team", espTeamState)
+    registerState("esp_keybind", espKeybind)
     ESP.ShowBox = espBoxState.Enabled
     ESP.ShowName = espNameState.Enabled
     ESP.ShowDistance = espDistState.Enabled
@@ -1388,7 +1422,7 @@ end)()
 end)()
 
 ;(function()
-    local _, chamsSet = buildModule(tabFrames.Render, {
+    local _, chamsSet, chamsEnable, chamsKeybind = buildModule(tabFrames.Render, {
         name="Chams", title="Chams", cardH=0.13, layoutOrder=2,
         titleSize=UDim2.new(0.44479,0,0.16359,0), titlePos=UDim2.new(0.27096,0,0.1594,0),
         enablePos=UDim2.new(0.85208,0,0.1594,0), enableSize=UDim2.new(0.09884,0,0.13842,0),
@@ -1399,6 +1433,11 @@ end)()
     local chamsTopState = makeToggleRow(chamsSet, "Always On Top", 0)
     local chamsOutlineState = makeToggleRow(chamsSet, "Outline", 1)
     local chamsTeamState = makeToggleRow(chamsSet, "Team Check", 3)
+    registerState("chams_enabled", chamsEnable)
+    registerState("chams_top", chamsTopState)
+    registerState("chams_outline", chamsOutlineState)
+    registerState("chams_team", chamsTeamState)
+    registerState("chams_keybind", chamsKeybind)
     Chams.AlwaysOnTop = chamsTopState.Enabled
     Chams.Outline = chamsOutlineState.Enabled
     Chams.TeamCheck = chamsTeamState.Enabled
