@@ -1,7 +1,7 @@
 repeat task.wait() until game:IsLoaded()
 
 do
-    local SELF_URL = "https://raw.githubusercontent.com/sbrtest231321/fghfsdyu8i7ge4579/refs/heads/main/main.lua"
+    local SELF_URL = "https://raw.githubusercontent.com/sbrtest231321/fghfsdyu8i7ge4579/refs/heads/main/sfghuygtr8.lua"
     if type(queueonteleport) == "function" then
         queueonteleport(([[
 repeat task.wait() until game:IsLoaded()
