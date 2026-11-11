@@ -805,6 +805,30 @@ local Fly = (function()
     return self
 end)()
 
+-- ========== NO JUMP DELAY ==========
+local NoJumpDelay = (function()
+    local self = { Enabled = false, _conn = nil }
+    function self.stop()
+        if self._conn then self._conn:Disconnect(); self._conn = nil end
+    end
+    function self.start()
+        self.stop()
+        self._conn = RunService.Heartbeat:Connect(function()
+            if not self.Enabled then return end
+            if UIS:GetFocusedTextBox() then return end
+            if UIS:IsKeyDown(Enum.KeyCode.Space) then
+                local c = LP.Character
+                if not c then return end
+                local h = c:FindFirstChildOfClass("Humanoid")
+                if h and h.Health > 0 then
+                    h.Jump = true
+                end
+            end
+        end)
+    end
+    return self
+end)()
+
 -- ========== AIM ASSIST ==========
 local AimAssist = (function()
     local self = { Enabled = false, Hold = true, Radius = 220, Smooth = 3, AimPart = "Head", WallCheck = true,
@@ -1356,6 +1380,19 @@ end)()
     registerState("fly_speed", flySpeedState)
     registerState("fly_vertical", flyVertState)
     registerState("fly_keybind", flyKeybind)
+end)()
+
+;(function()
+    local _, njdSet, njdEnable, njdKeybind = buildModule(tabFrames.Movement, {
+        name="NoJumpDelay", title="No Jump Delay", cardH=0.07, layoutOrder=3,
+        titleSize=UDim2.new(0.445,0,0.304,0), titlePos=UDim2.new(0.271,0,0.296,0),
+        enablePos=UDim2.new(0.852,0,0.296,0), enableSize=UDim2.new(0.099,0,0.257,0),
+        keybindPos=UDim2.new(0.675,0,0.288,0), keybindSize=UDim2.new(0.15,0,0.241,0),
+        settingsPos=UDim2.new(0.498,0,2.064,0), settingsSize=UDim2.new(0.999,0,2.984,0),
+        onEnable=function(v) NoJumpDelay.Enabled = v; if v then NoJumpDelay.start() else NoJumpDelay.stop() end end,
+    })
+    registerState("njd_enabled", njdEnable)
+    registerState("njd_keybind", njdKeybind)
 end)()
 
 ;(function()
