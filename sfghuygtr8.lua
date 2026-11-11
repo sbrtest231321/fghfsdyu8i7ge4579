@@ -915,7 +915,6 @@ local AimAssist = (function()
     return self
 end)()
 
--- ========== RAGE BOT ==========
 local RageBot = (function()
     local self = { Enabled = false, LimitToFOV = false, QuickScope = false, TeamCheck = false, MaxDistance = 500,
         FOVRadius = 220, WallCheck = true, ClickCooldown = 0.5, _lastClick = 0 }
@@ -1021,7 +1020,6 @@ local RageBot = (function()
     return self
 end)()
 
--- ========== LONG NECK ==========
 local LongNeck = (function()
     local self = { Enabled = false, LiftAmount = 10, _conn = nil, _holding = false, _targetY = nil, _baseY = nil }
     function self.stop()
@@ -1048,7 +1046,6 @@ local LongNeck = (function()
     return self
 end)()
 
--- ========== THIRD PERSON ==========
 local ThirdPerson = (function()
     local self = { Enabled = false, _conn = nil, _charConn = nil, _charAddedConn = nil, _saved = nil }
     local function applyTransparency(model)
@@ -1117,33 +1114,37 @@ local ThirdPerson = (function()
     return self
 end)()
 
--- ========== MOUSE MANAGER ==========
 ;(function()
     local savedB, savedI, savedValid = nil, nil, false
-    local menuWasOpen, tpWasOn = false, false
+    local prevMenu, prevTP, prevTab = false, false, false
     RunService.RenderStepped:Connect(function()
         local menuOpen = G2L["2"] and G2L["2"].Visible
         local tpOn = ThirdPerson.Enabled
+        local tabHeld = UIS:IsKeyDown(Enum.KeyCode.Tab)
+        local wantFreeMouse = menuOpen or tabHeld
+
         local shouldSave = false
-        if menuOpen and not menuWasOpen and not tpOn then shouldSave = true end
-        if tpOn and not tpWasOn and not menuOpen then shouldSave = true end
+        if (wantFreeMouse and not (prevMenu or prevTab)) then shouldSave = true end
+        if (tpOn and not prevTP and not wantFreeMouse) then shouldSave = true end
         if shouldSave and not savedValid then
             savedB = UIS.MouseBehavior
             savedI = UIS.MouseIconEnabled
             savedValid = true
         end
+
         local shouldRestore = false
-        if not menuOpen and not tpOn and savedValid then
-            if menuWasOpen or tpWasOn then shouldRestore = true end
+        if not wantFreeMouse and not tpOn and savedValid then
+            if prevMenu or prevTab or prevTP then shouldRestore = true end
         end
         if shouldRestore then
             UIS.MouseBehavior = savedB
             UIS.MouseIconEnabled = savedI
             savedB, savedI, savedValid = nil, nil, false
         end
-        menuWasOpen = menuOpen
-        tpWasOn = tpOn
-        if menuOpen then
+
+        prevMenu, prevTP, prevTab = menuOpen, tpOn, tabHeld
+
+        if wantFreeMouse then
             if UIS.MouseBehavior ~= Enum.MouseBehavior.Default then UIS.MouseBehavior = Enum.MouseBehavior.Default end
             if not UIS.MouseIconEnabled then UIS.MouseIconEnabled = true end
         elseif tpOn then
@@ -1152,8 +1153,6 @@ end)()
         end
     end)
 end)()
-
--- ========== UI SETUP ==========
 
 ;(function()
     local _, saSet, saEnable, saKeybind = buildModule(tabFrames.Combat, {
