@@ -508,6 +508,7 @@ local TriggerBot = (function()
         return hp, hitChar
     end
     local function click()
+            task.wait(0.05)
         local m1 = getgenv().mouse1click or (type(mouse1click) == "function" and mouse1click)
         if type(m1) == "function" then pcall(m1); return true end
         local vim = game:GetService("VirtualInputManager")
