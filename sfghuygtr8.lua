@@ -26,7 +26,6 @@ local LP = Players.LocalPlayer
 local GuiService = game:GetService("GuiService")
 local TweenService = game:GetService("TweenService")
 
--- Загрузка UI
 local UI_URL = "https://raw.githubusercontent.com/sbrtest231321/fghfsdyu8i7ge4579/refs/heads/main/ui.lua"
 local UI = loadstring(game:HttpGet(UI_URL, true))()
 
