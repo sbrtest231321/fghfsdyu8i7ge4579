@@ -450,7 +450,7 @@ local SilentAim = (function()
                 if choice and Config.tracersEnabled and result[2] then
                     local myChar = LP.Character
                     local head = myChar and myChar:FindFirstChild("Head")
-                    if head then spawnTracer(head.Position - Vector3.new(0, 0.5,0), choice.position) end
+                    if head then spawnTracer(head.Position - Vector3.new(0, 0.5, 0), choice.position) end
                 end
                 return table.unpack(result, 2, result.n)
             end)
@@ -507,8 +507,8 @@ local TriggerBot = (function()
         if self.VisibleCheck and not WallCheck.CanSee(Camera, hitChar, res.Position) then return nil end
         return hp, hitChar
     end
+    -- Функция click без внутренней задержки — задержка добавлена в цикле перед её вызовом
     local function click()
-            task.wait(0.05)
         local m1 = getgenv().mouse1click or (type(mouse1click) == "function" and mouse1click)
         if type(m1) == "function" then pcall(m1); return true end
         local vim = game:GetService("VirtualInputManager")
@@ -532,6 +532,7 @@ local TriggerBot = (function()
             local now = os.clock()
             if now - self._lastClick < self.ClickCooldown then return end
             self._lastClick = now
+            task.wait(0.05) -- задержка перед кликом
             click()
         end)
     end
@@ -940,6 +941,7 @@ local AimAssist = (function()
     return self
 end)()
 
+-- ========== RAGE BOT ==========
 local RageBot = (function()
     local self = { Enabled = false, LimitToFOV = false, QuickScope = false, TeamCheck = false, MaxDistance = 500,
         FOVRadius = 220, WallCheck = true, ClickCooldown = 0.5, _lastClick = 0 }
@@ -965,8 +967,8 @@ local RageBot = (function()
             pcall(function() vim:SendMouseButtonEvent(mp.X, mp.Y, 2, false, game, 1, false) end)
         end
     end
+    -- Функция click без внутренней задержки — задержка добавлена в цикле перед её вызовом
     local function click()
-            task.wait(0.05)
         local m1 = getgenv().mouse1click or (type(mouse1click) == "function" and mouse1click)
         if type(m1) == "function" then pcall(m1); return true end
         local vim = game:GetService("VirtualInputManager")
@@ -1030,11 +1032,12 @@ local RageBot = (function()
                             end
                             if self.QuickScope then
                                 qsScopeDown()
-                                task.wait(0.15)
+                                task.wait(0.15) -- время на прицеливание
                                 click()
-                                task.wait(0.1)
+                                task.wait(0.1)  -- время чтобы выстрел зарегистрировался
                                 qsScopeUp()
                             else
+                                task.wait(0.05) -- задержка перед кликом
                                 click()
                             end
                         end
@@ -1046,6 +1049,7 @@ local RageBot = (function()
     return self
 end)()
 
+-- ========== LONG NECK ==========
 local LongNeck = (function()
     local self = { Enabled = false, LiftAmount = 10, _conn = nil, _holding = false, _targetY = nil, _baseY = nil }
     function self.stop()
@@ -1072,6 +1076,7 @@ local LongNeck = (function()
     return self
 end)()
 
+-- ========== THIRD PERSON ==========
 local ThirdPerson = (function()
     local self = { Enabled = false, _conn = nil, _charConn = nil, _charAddedConn = nil, _saved = nil }
     local function applyTransparency(model)
@@ -1140,6 +1145,7 @@ local ThirdPerson = (function()
     return self
 end)()
 
+-- ========== MOUSE MANAGER ==========
 ;(function()
     local savedB, savedI, savedValid = nil, nil, false
     local prevMenu, prevTP, prevTab = false, false, false
@@ -1179,6 +1185,8 @@ end)()
         end
     end)
 end)()
+
+-- ========== UI SETUP ==========
 
 ;(function()
     local _, saSet, saEnable, saKeybind = buildModule(tabFrames.Combat, {
